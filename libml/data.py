@@ -147,7 +147,7 @@ class DataSet:
         if not isinstance(augment, list):
             augment = [augment] * 2
         fullname = '.%d@%d' % (seed, label)
-        root = os.path.join(DATA_DIR, 'SSL', name + fullname)
+        root = os.path.join(DATA_DIR, 'SSL', name + fullname) # TODO LIST to consider 'seed'
         fn = memoize if do_memoize else lambda x: x.repeat().shuffle(FLAGS.shuffle)
 
         def create():
@@ -212,6 +212,7 @@ class DataSetFS(DataSet):
 
         def create():
             para = max(1, len(utils.get_available_gpus())) * FLAGS.para_augment
+            # valid: sample size of a validation set
             train_labeled = parse_fn(dataset(train_files).skip(valid))
             if FLAGS.whiten:
                 mean, std = compute_mean_std(train_labeled)
@@ -221,7 +222,7 @@ class DataSetFS(DataSet):
             return cls(name + '-' + str(valid),
                        train_labeled=fn(train_labeled).map(augment, para),
                        train_unlabeled=None,
-                       eval_labeled=train_labeled.take(5000),  # No need to to eval on everything.
+                       eval_labeled=train_labeled.take(5000),  # No need to eval on everything.
                        eval_unlabeled=None,
                        valid=parse_fn(dataset(train_files).take(valid)),
                        test=parse_fn(dataset(test_files)),

@@ -36,7 +36,6 @@ URLS = {
     'svhn': 'http://ufldl.stanford.edu/housenumbers/{}_32x32.mat',
     'cifar10': 'https://www.cs.toronto.edu/~kriz/cifar-10-matlab.tar.gz',
     'cifar100': 'https://www.cs.toronto.edu/~kriz/cifar-100-matlab.tar.gz',
-    'stl10': 'http://ai.stanford.edu/~acoates/stl10/stl10_binary.tar.gz',
 }
 
 
@@ -52,7 +51,8 @@ def _encode_png(images):
 
 def _load_svhn():
     splits = collections.OrderedDict()
-    for split in ['train', 'test', 'extra']:
+    # for split in ['train', 'test', 'extra']:
+    for split in ['train', 'test']:
         with tempfile.NamedTemporaryFile() as f:
             request.urlretrieve(URLS['svhn'].format(split), f.name)
             data_dict = scipy.io.loadmat(f.name)
@@ -64,45 +64,6 @@ def _load_svhn():
         dataset['labels'] -= 1
         splits[split] = dataset
     return splits
-
-
-def _load_stl10():
-    def unflatten(images):
-        return np.transpose(images.reshape((-1, 3, 96, 96)),
-                            [0, 3, 2, 1])
-
-    with tempfile.NamedTemporaryFile() as f:
-        if os.path.exists('stl10/stl10_binary.tar.gz'):
-            f = open('stl10/stl10_binary.tar.gz', 'rb')
-        else:
-            request.urlretrieve(URLS['stl10'], f.name)
-        tar = tarfile.open(fileobj=f)
-        train_X = tar.extractfile('stl10_binary/train_X.bin')
-        train_y = tar.extractfile('stl10_binary/train_y.bin')
-
-        test_X = tar.extractfile('stl10_binary/test_X.bin')
-        test_y = tar.extractfile('stl10_binary/test_y.bin')
-
-        unlabeled_X = tar.extractfile('stl10_binary/unlabeled_X.bin')
-
-        train_set = {'images': np.frombuffer(train_X.read(), dtype=np.uint8),
-                     'labels': np.frombuffer(train_y.read(), dtype=np.uint8) - 1}
-
-        test_set = {'images': np.frombuffer(test_X.read(), dtype=np.uint8),
-                    'labels': np.frombuffer(test_y.read(), dtype=np.uint8) - 1}
-
-        _imgs = np.frombuffer(unlabeled_X.read(), dtype=np.uint8)
-        unlabeled_set = {'images': _imgs,
-                         'labels': np.zeros(100000, dtype=np.uint8)}
-
-        fold_indices = tar.extractfile('stl10_binary/fold_indices.txt').read()
-
-    train_set['images'] = _encode_png(unflatten(train_set['images']))
-    test_set['images'] = _encode_png(unflatten(test_set['images']))
-    unlabeled_set['images'] = _encode_png(unflatten(unlabeled_set['images']))
-    return dict(train=train_set, test=test_set, unlabeled=unlabeled_set,
-                files=[EasyDict(filename="stl10_fold_indices.txt", data=fold_indices)])
-
 
 def _load_cifar10():
     def unflatten(images):
@@ -190,16 +151,16 @@ def _is_installed_folder(name, folder):
     return os.path.exists(os.path.join(DATA_DIR, name, folder))
 
 
+# CIFAR-10 first
 CONFIGS = dict(
     cifar10=dict(loader=_load_cifar10,
                  checksums=dict(train=None, test=None)),
-    cifar100=dict(loader=_load_cifar100,
-                  checksums=dict(train=None, test=None)),
-    svhn=dict(loader=_load_svhn,
-              checksums=dict(train=None, test=None, extra=None)),
-    stl10=dict(loader=_load_stl10,
-               checksums=dict(train=None, test=None)),
+    # cifar100=dict(loader=_load_cifar100,
+    #               checksums=dict(train=None, test=None)),
+    # svhn=dict(loader=_load_svhn,
+    #           checksums=dict(train=None, test=None, extra=None)),    
 )
+
 
 if __name__ == '__main__':
     if len(sys.argv[1:]):

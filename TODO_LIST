@@ -3,6 +3,8 @@ CURRENT
 'tmuxp load runs/cifar10-erm-mixup.yml' works well
 
 TODO LIST
-1. install_datasets.sh -> create/split datasets
-2. build the proposed method 
+1. install_datasets.sh -> scripts/create_split.py -> test
+2. build the proposed method (CIFAR-10)
+
+
 
