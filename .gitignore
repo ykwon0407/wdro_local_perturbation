@@ -1,5 +1,6 @@
 *.iml
 *.tfrecord
+*.json
 .idea
 3rdparty/
 experiments/
