@@ -123,13 +123,11 @@ def compute_mean_std(data: tf.data.Dataset):
 
 
 class DataSet:
-    def __init__(self, name, train_labeled, train_unlabeled, test, valid, eval_labeled, eval_unlabeled,
-                 height=32, width=32, colors=3, nclass=10, mean=0, std=1, p_labeled=None, p_unlabeled=None):
+    def __init__(self, name, train_labeled, test, valid, eval_labeled,
+                 height=32, width=32, colors=3, nclass=10, mean=0, std=1):
         self.name = name
         self.train_labeled = train_labeled
-        self.train_unlabeled = train_unlabeled
         self.eval_labeled = eval_labeled
-        self.eval_unlabeled = eval_unlabeled
         self.test = test
         self.valid = valid
         self.height = height
@@ -138,76 +136,13 @@ class DataSet:
         self.nclass = nclass
         self.mean = mean
         self.std = std
-        self.p_labeled = p_labeled
-        self.p_unlabeled = p_unlabeled
 
     @classmethod
     def creator(cls, name, seed, label, valid, augment, parse_fn=default_parse, do_memoize=True, colors=3,
                 nclass=10, height=32, width=32, name_suffix=''):
-        if not isinstance(augment, list):
-            augment = [augment] * 2
         fullname = '.%d@%d' % (seed, label)
-        root = os.path.join(DATA_DIR, 'SSL', name + fullname) # TODO LIST to consider 'seed'
-        fn = memoize if do_memoize else lambda x: x.repeat().shuffle(FLAGS.shuffle)
-
-        def create():
-            p_labeled = p_unlabeled = None
-            para = max(1, len(utils.get_available_gpus())) * FLAGS.para_augment
-
-            if FLAGS.p_unlabeled:
-                sequence = FLAGS.p_unlabeled.split(',')
-                p_unlabeled = np.array(list(map(float, sequence)), dtype=np.float32)
-                p_unlabeled /= np.max(p_unlabeled)
-
-            train_labeled = parse_fn(dataset([root + '-label.tfrecord']))
-            train_unlabeled = parse_fn(dataset([root + '-unlabel.tfrecord']).skip(valid))
-            if FLAGS.whiten:
-                mean, std = compute_mean_std(train_labeled.concatenate(train_unlabeled))
-            else:
-                mean, std = 0, 1
-
-            return cls(name + name_suffix + fullname + '-' + str(valid),
-                       train_labeled=fn(train_labeled).map(augment[0], para),
-                       train_unlabeled=fn(train_unlabeled).map(augment[1], para),
-                       eval_labeled=parse_fn(dataset([root + '-label.tfrecord'])),
-                       eval_unlabeled=parse_fn(dataset([root + '-unlabel.tfrecord']).skip(valid)),
-                       valid=parse_fn(dataset([root + '-unlabel.tfrecord']).take(valid)),
-                       test=parse_fn(dataset([os.path.join(DATA_DIR, '%s-test.tfrecord' % name)])),
-                       nclass=nclass, colors=colors, p_labeled=p_labeled, p_unlabeled=p_unlabeled,
-                       height=height, width=width, mean=mean, std=std)
-
-        return name + name_suffix + fullname + '-' + str(valid), create
-
-augment_stl10 = lambda x: dict(image=augment_shift(augment_mirror(x['image']), 12), label=x['label'])
-augment_cifar10 = lambda x: dict(image=augment_shift(augment_mirror(x['image']), 4), label=x['label'])
-augment_svhn = lambda x: dict(image=augment_shift(x['image'], 4), label=x['label'])
-
-'''
-DATASETS = {}
-DATASETS.update([DataSet.creator('cifar10', seed, label, valid, augment_cifar10)
-                 for seed, label, valid in
-                 itertools.product(range(6), [250, 500, 1000, 2000, 4000, 8000], [1, 5000])])
-DATASETS.update([DataSet.creator('cifar100', seed, label, valid, augment_cifar10, nclass=100)
-                 for seed, label, valid in
-                 itertools.product(range(6), [10000], [1, 5000])])
-DATASETS.update([DataSet.creator('stl10', seed, label, valid, augment_stl10, height=96, width=96, do_memoize=False)
-                 for seed, label, valid in
-                 itertools.product(range(6), [1000, 5000], [1, 500])])
-DATASETS.update([DataSet.creator('svhn', seed, label, valid, augment_svhn, do_memoize=False)
-                 for seed, label, valid in
-                 itertools.product(range(6), [250, 500, 1000, 2000, 4000, 8000], [1, 5000])])
-DATASETS.update([DataSet.creator('svhn_noextra', seed, label, valid, augment_svhn, do_memoize=False)
-                 for seed, label, valid in
-                 itertools.product(range(6), [250, 500, 1000, 2000, 4000, 8000], [1, 5000])])
-
-'''
-
-class DataSetFS(DataSet):
-    @classmethod
-    def creator(cls, name, train_files, test_files, valid, augment, parse_fn=default_parse, do_memoize=True,
-                colors=3, nclass=10, height=32, width=32):
-        train_files = [os.path.join(DATA_DIR, x) for x in train_files]
-        test_files = [os.path.join(DATA_DIR, x) for x in test_files]
+        train_files = [os.path.join(DATA_DIR, name, name + fullname) + '.tfrecord']
+        test_files = [os.path.join(DATA_DIR, '%s-test.tfrecord' % name)]
         fn = memoize if do_memoize else lambda x: x.repeat().shuffle(FLAGS.shuffle)
 
         def create():
@@ -219,26 +154,29 @@ class DataSetFS(DataSet):
             else:
                 mean, std = 0, 1
 
-            return cls(name + '-' + str(valid),
+            return cls(name + name_suffix + fullname + '-' + str(valid),
                        train_labeled=fn(train_labeled).map(augment, para),
                        train_unlabeled=None,
-                       eval_labeled=train_labeled.take(5000),  # No need to eval on everything.
+                       eval_labeled=train_labeled.take(5000), # No need to eval on everything.
                        eval_unlabeled=None,
                        valid=parse_fn(dataset(train_files).take(valid)),
                        test=parse_fn(dataset(test_files)),
                        nclass=nclass, colors=colors, height=height, width=width, mean=mean, std=std)
 
-        return name + '-' + str(valid), create
+        return name + name_suffix + fullname + '-' + str(valid), create
+
+augment_stl10 = lambda x: dict(image=augment_shift(augment_mirror(x['image']), 12), label=x['label'])
+augment_cifar10 = lambda x: dict(image=augment_shift(augment_mirror(x['image']), 4), label=x['label'])
+augment_svhn = lambda x: dict(image=augment_shift(x['image'], 4), label=x['label'])
 
 
 DATASETS = {}
-DATASETS.update([DataSetFS.creator('cifar10', ['cifar10-train.tfrecord'], ['cifar10-test.tfrecord'], valid,
-                                   augment_cifar10) for valid in [1, 5000]])
-DATASETS.update([DataSetFS.creator('cifar100', ['cifar100-train.tfrecord'], ['cifar100-test.tfrecord'], valid,
-                                   augment_cifar10, nclass=100) for valid in [1, 5000]])
-DATASETS.update([DataSetFS.creator('stl10', [], [], valid, augment_stl10, height=96, width=96, do_memoize=False)
-                 for valid in [1, 5000]])
-DATASETS.update([DataSetFS.creator('svhn', ['svhn-train.tfrecord', 'svhn-extra.tfrecord'], ['svhn-test.tfrecord'],
-                                   valid, augment_svhn, do_memoize=False) for valid in [1, 5000]])
-DATASETS.update([DataSetFS.creator('svhn_noextra', ['svhn-train.tfrecord'], ['svhn-test.tfrecord'],
-                                   valid, augment_svhn, do_memoize=False) for valid in [1, 5000]])
+DATASETS.update([DataSet.creator('cifar10', seed, label, valid, augment_cifar10)
+                 for seed, label, valid in
+                 itertools.product(range(6), [10000, 20000, 30000, 40000, 50000], [1, 5000])])
+DATASETS.update([DataSet.creator('cifar100', seed, label, valid, augment_cifar10, nclass=100)
+                 for seed, label, valid in
+                 itertools.product(range(6), [10000, 20000, 30000, 40000, 50000], [1, 5000])])
+
+
+
