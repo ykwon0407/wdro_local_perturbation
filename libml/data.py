@@ -32,7 +32,6 @@ flags.DEFINE_string('dataset', 'cifar10.1@4000-5000', 'Data to train on.')
 flags.DEFINE_integer('para_parse', 4, 'Parallel parsing.')
 flags.DEFINE_integer('para_augment', 4, 'Parallel augmentation.')
 flags.DEFINE_integer('shuffle', 8192, 'Size of dataset shuffling.')
-flags.DEFINE_string('p_unlabeled', '', 'Probability distribution of unlabeled.')
 flags.DEFINE_bool('whiten', False, 'Whether to normalize images.')
 FLAGS = flags.FLAGS
 
@@ -156,9 +155,7 @@ class DataSet:
 
             return cls(name + name_suffix + fullname + '-' + str(valid),
                        train_labeled=fn(train_labeled).map(augment, para),
-                       train_unlabeled=None,
                        eval_labeled=train_labeled.take(5000), # No need to eval on everything.
-                       eval_unlabeled=None,
                        valid=parse_fn(dataset(train_files).take(valid)),
                        test=parse_fn(dataset(test_files)),
                        nclass=nclass, colors=colors, height=height, width=width, mean=mean, std=std)

@@ -1,9 +1,0 @@
-session_name: cifar10-erm-mixup
-windows:
-        - window_name: cifar10-erm-mixup
-          layout: even-vertical
-          shell_command_before: cd ~/deep/project/dro-id/
-          panes:
-                  - CUDA_VISIBLE_DEVICES=1 python3 erm.py --train_dir experiments/test --dataset=cifar10-1 --wd=0.02 --smoothing 0.001
-                  - CUDA_VISIBLE_DEVICES=3 python3 mixup.py --train_dir experiments/test --dataset=cifar10-1
-                  
