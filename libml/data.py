@@ -26,7 +26,7 @@ from tqdm import tqdm
 from libml import utils
 
 _DATA_CACHE = None
-os.environ['ML_DATA'] = './ML_DATA'
+os.environ['ML_DATA'] = './input'
 DATA_DIR = os.environ['ML_DATA']
 flags.DEFINE_string('dataset', 'cifar10.1@4000-5000', 'Data to train on.')
 flags.DEFINE_integer('para_parse', 4, 'Parallel parsing.')

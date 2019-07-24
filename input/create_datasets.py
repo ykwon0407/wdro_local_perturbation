@@ -24,6 +24,7 @@ import sys
 import tarfile
 import tempfile
 from urllib import request
+sys.path.append('./')
 
 from easydict import EasyDict
 from libml.data import DATA_DIR
@@ -51,8 +52,7 @@ def _encode_png(images):
 
 def _load_svhn():
     splits = collections.OrderedDict()
-    # for split in ['train', 'test', 'extra']:
-    for split in ['train', 'test']:
+    for split in ['train', 'test', 'extra']:
         with tempfile.NamedTemporaryFile() as f:
             request.urlretrieve(URLS['svhn'].format(split), f.name)
             data_dict = scipy.io.loadmat(f.name)
@@ -155,8 +155,8 @@ def _is_installed_folder(name, folder):
 CONFIGS = dict(
     cifar10=dict(loader=_load_cifar10,
                  checksums=dict(train=None, test=None)),
-    # cifar100=dict(loader=_load_cifar100,
-    #               checksums=dict(train=None, test=None)),
+    cifar100=dict(loader=_load_cifar100,
+                  checksums=dict(train=None, test=None)),
     # svhn=dict(loader=_load_svhn,
     #           checksums=dict(train=None, test=None, extra=None)),    
 )
@@ -167,6 +167,9 @@ if __name__ == '__main__':
         subset = set(sys.argv[1:])
     else:
         subset = set(CONFIGS.keys())
+
+    print('Datasets: {}'.format(subset))
+
     try:
         os.makedirs(DATA_DIR)
     except OSError:
@@ -195,3 +198,8 @@ if __name__ == '__main__':
                     open(path, "wb").write(file_and_data.data)
             else:
                 saver(data, '%s-%s' % (name, sub_name))
+    
+    
+
+
+

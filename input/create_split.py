@@ -19,7 +19,8 @@
 
 from collections import defaultdict
 import json
-import os
+import os, sys
+sys.path.append('./')
 
 from absl import app
 from absl import flags
@@ -43,6 +44,7 @@ def get_class(serialized_example):
 def main(argv):
     assert FLAGS.size
     argv.pop(0)
+
     if any(not os.path.exists(f) for f in argv[1:]):
         raise FileNotFoundError(argv[1:])
     target = '%s.%d@%d' % (argv[0], FLAGS.seed, FLAGS.size)
@@ -62,15 +64,17 @@ def main(argv):
                 old_count = count
                 for i in session.run(it):
                     id_class.append(i)
-                    class_id[i].append(count)
+                    # Dictionary consists of {class label : [index list]}
+                    class_id[i].append(count) 
                     count += 1
                 t.update(count - old_count)
     except tf.errors.OutOfRangeError:
         pass
     print('%d records found' % count)
-    nclass = len(class_id)
+    nclass = len(class_id) # number of classes
     train_stats = np.array([len(class_id[i]) for i in range(nclass)], np.float64)
     train_stats /= train_stats.max()
+
     if 'stl10' in argv[1]:
         # All of the unlabeled data is given label 0, but we know that
         # STL has equally distributed data among the 10 classes.
@@ -91,7 +95,6 @@ def main(argv):
         c = np.argmax(train_stats - npos / max(npos.max(), 1))
         label.append(class_id[c][npos[c]])
         npos[c] += 1
-
     del npos, class_id
     label = frozenset([int(x) for x in label])
     if 'stl10' in argv[1] and FLAGS.size == 1000:
@@ -100,39 +103,24 @@ def main(argv):
 
     print('Creating split in %s' % target)
     npos = np.zeros(nclass, np.int64)
-    class_data = [[] for _ in range(nclass)]
-    unlabel = []
     os.makedirs(os.path.dirname(target), exist_ok=True)
-    with tf.python_io.TFRecordWriter(target + '-label.tfrecord') as writer_label, tf.python_io.TFRecordWriter(
-            target + '-unlabel.tfrecord') as writer_unlabel:
+    with tf.python_io.TFRecordWriter(target + '.tfrecord') as writer_label: 
         pos, loop = 0, trange(count, desc='Writing records')
         for input_file in input_files:
             for record in tf.python_io.tf_record_iterator(input_file):
                 if pos in label:
                     writer_label.write(record)
-                else:
-                    class_data[id_class[pos]].append((pos, record))
-                    while True:
-                        c = np.argmax(train_stats - npos / max(npos.max(), 1))
-                        if class_data[c]:
-                            p, v = class_data[c].pop(0)
-                            unlabel.append(p)
-                            writer_unlabel.write(v)
-                            npos[c] += 1
-                        else:
-                            break
                 pos += 1
                 loop.update()
-        for remain in class_data:
-            for p, v in remain:
-                unlabel.append(p)
-                writer_unlabel.write(v)
         loop.close()
     with open(target + '-map.json', 'w') as writer:
         writer.write(json.dumps(
-            dict(label=sorted(label), unlabel=unlabel), indent=2, sort_keys=True))
+            dict(label=sorted(label)), indent=2, sort_keys=True))
 
 
 if __name__ == '__main__':
     utils.setup_tf()
     app.run(main)
+
+
+    

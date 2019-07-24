@@ -2,7 +2,7 @@
 *.tfrecord
 .idea
 3rdparty/
-experiments/*
+experiments/
 gpumux/
 ML_DATA/
 
@@ -25,3 +25,5 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.pyc
+
+TODO_LIST
