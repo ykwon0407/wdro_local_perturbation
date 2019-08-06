@@ -1,0 +1,12 @@
+session_name: cifar10-erm@2500
+windows:
+        - window_name: cifar10-erm@2500
+          layout: even-vertical
+          shell_command_before: cd ~/deep/project/dro-id/
+          panes:
+                  - CUDA_VISIBLE_DEVICES=1 python3 erm.py --train_dir experiments/erm@2500 --dataset=cifar10.1@2500-1 --wd=0.02 --smoothing 0.001 --nepoch 100
+                  - CUDA_VISIBLE_DEVICES=0 python3 erm.py --train_dir experiments/erm@2500 --dataset=cifar10.2@2500-1 --wd=0.02 --smoothing 0.001 --nepoch 100
+                  - CUDA_VISIBLE_DEVICES=1 python3 erm.py --train_dir experiments/erm@2500 --dataset=cifar10.3@2500-1 --wd=0.02 --smoothing 0.001 --nepoch 100
+                  - CUDA_VISIBLE_DEVICES=0 python3 erm.py --train_dir experiments/erm@2500 --dataset=cifar10.4@2500-1 --wd=0.02 --smoothing 0.001 --nepoch 100
+                  - CUDA_VISIBLE_DEVICES=1 python3 erm.py --train_dir experiments/erm@2500 --dataset=cifar10.5@2500-1 --wd=0.02 --smoothing 0.001 --nepoch 100
+                  

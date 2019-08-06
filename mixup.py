@@ -98,7 +98,8 @@ def main(argv):
         scales=FLAGS.scales or (log_width - 2),
         filters=FLAGS.filters,
         repeat=FLAGS.repeat)
-    model.train(FLAGS.train_kimg << 10, FLAGS.report_kimg << 10)
+    model.train(FLAGS.nepoch*FLAGS.epochsize, FLAGS.epochsize) #(total # of data, epoch size)
+    #model.train(FLAGS.train_kimg << 10, FLAGS.report_kimg << 10)
 
 
 if __name__ == '__main__':
@@ -109,8 +110,10 @@ if __name__ == '__main__':
     flags.DEFINE_integer('scales', 0, 'Number of 2x2 downscalings in the classifier.')
     flags.DEFINE_integer('filters', 32, 'Filter size of convolutions.')
     flags.DEFINE_integer('repeat', 4, 'Number of residual layers per stage.')
+    flags.DEFINE_integer('nepoch', 1 << 7, 'Number of training epochs')
+    flags.DEFINE_integer('epochsize', 1 << 16, 'Size of 1 epoch')
     FLAGS.set_default('dataset', 'cifar10-1')
     FLAGS.set_default('batch', 64)
     FLAGS.set_default('lr', 0.002)
-    FLAGS.set_default('train_kimg', 1 << 16)
+    #FLAGS.set_default('train_kimg', 1 << 16)
     app.run(main)

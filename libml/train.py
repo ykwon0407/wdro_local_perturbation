@@ -35,7 +35,7 @@ flags.DEFINE_integer('report_kimg', 64, 'Report summary period in kibi-samples.'
 flags.DEFINE_integer('save_kimg', 64, 'Save checkpoint period in kibi-samples.')
 flags.DEFINE_integer('keep_ckpt', 50, 'Number of checkpoints to keep.')
 flags.DEFINE_string('eval_ckpt', '', 'Checkpoint to evaluate. If provided, do not do training, just do eval.')
-
+flags.DEFINE_integer('saveperepoch', 10, 'epochs per Save checkpoint')
 
 class Model:
     def __init__(self, train_dir: str, dataset: data.DataSet, **kwargs):
@@ -49,6 +49,15 @@ class Model:
         self.ops.update_step = tf.assign_add(self.step, FLAGS.batch)
         self.add_summaries(**kwargs)
 
+        #Initialize accuracies.txt
+        if os.path.exists(self.train_dir + "/accuracies.txt"):
+            with open(self.train_dir + "/accuracies.txt", 'r') as infile:
+                self.accuracies = json.loads(infile.read())
+        else:
+            self.accuracies = {}
+
+        #Print model Config.
+        print()
         print(' Config '.center(80, '-'))
         print('train_dir', self.train_dir)
         print('%-32s %s' % ('Model', self.__class__.__name__))
@@ -156,10 +165,11 @@ class Model_clf(Model):
                 scaffold=scaffold,
                 checkpoint_dir=self.checkpoint_dir,
                 config=utils.get_config(),
-                save_checkpoint_steps=FLAGS.save_kimg << 10,
+                save_checkpoint_steps=FLAGS.saveperepoch*report_nimg, #FLAGS.save_kimg,
                 save_summaries_steps=report_nimg - batch) as train_session:
             self.session = train_session._tf_sess()
             self.tmp.step = self.session.run(self.step)
+            # epoch?
             while self.tmp.step < train_nimg:
                 loop = trange(self.tmp.step % report_nimg, report_nimg, batch,
                               leave=False, unit='img', unit_scale=batch,
@@ -176,7 +186,7 @@ class Model_clf(Model):
         # with self.graph.as_default():
         train_labeled = self.dataset.train_labeled.batch(batch).prefetch(16)
         train_labeled = train_labeled.make_one_shot_iterator().get_next()
-
+        # epoch? 
         for _ in trange(0, train_nimg, batch, leave=False, unit='img', unit_scale=batch, desc='Tuning'):
             x = self.session.run([train_labeled])
             self.session.run([self.ops.tune_op], feed_dict={self.ops.x: x['image'],
@@ -239,8 +249,12 @@ class Model_clf(Model):
                 predicted.append(p)
             predicted = np.concatenate(predicted, axis=0)
             accuracies.append((predicted.argmax(1) == labels).mean() * 100)
-        self.train_print('kimg %-5d  accuracy train/valid/test  %.2f  %.2f  %.2f' %
+        self.train_print('%-5d k imgs  accuracy train/valid/test  %.2f  %.2f  %.2f' %
                          tuple([self.tmp.step >> 10] + accuracies))
+        self.accuracies['epoch' + str(self.tmp.step // FLAGS.epochsize)] = accuracies
+        with open(os.path.join(self.train_dir, 'accuracies.txt'), 'w') as outfile:
+            json.dump(self.accuracies, outfile)
+        #print(accuracies)
         return np.array(accuracies, 'f')
 
     def add_summaries(self, feed_extra=None, **kwargs):
