@@ -170,10 +170,10 @@ augment_svhn = lambda x: dict(image=augment_shift(x['image'], 4), label=x['label
 DATASETS = {}
 DATASETS.update([DataSet.creator('cifar10', seed, label, valid, augment_cifar10)
                  for seed, label, valid in
-                 itertools.product(range(6), [10000, 20000, 30000, 40000, 50000], [1, 5000])])
+                 itertools.product(range(6), [100, 500, 1000, 2500, 5000, 25000, 50000], [1, 5000])])
 DATASETS.update([DataSet.creator('cifar100', seed, label, valid, augment_cifar10, nclass=100)
                  for seed, label, valid in
-                 itertools.product(range(6), [10000, 20000, 30000, 40000, 50000], [1, 5000])])
+                 itertools.product(range(6), [1000, 2500, 5000, 25000, 50000], [1, 5000])])
 
 
 
