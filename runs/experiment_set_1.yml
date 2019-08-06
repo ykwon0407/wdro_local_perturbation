@@ -1,0 +1,7 @@
+session_name: erm+mixup_cifar
+windows:
+        - window_name: erm+mixup_cifar
+          layout: even-vertical
+          shell_command_before: cd ~/deep/project/dro-id
+          panes:
+                  - sh runs/experimentset1.sh
