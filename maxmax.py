@@ -29,7 +29,7 @@ import tensorflow as tf
 
 FLAGS = flags.FLAGS
 
-# TODO : class name !!!
+
 class FSMixup(MultiModel):
 
     def augment(self, x, l, beta, **kwargs):
@@ -55,9 +55,9 @@ class FSMixup(MultiModel):
         logits_x = get_logits(x)
 
         loss_xe = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_x, logits=logits_x)
-        gradient = tf.gradients(loss_xe, x) # PLASE ADD COMMENTS.
-        regularizer = tf.reduce_mean(tf.nn.l2_loss(gradient))
-        loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(regularizer, tf.square(FLAGS.LH))
+        gradient = tf.gradients(loss_xe, x)
+        regularizer = tf.reduce_max(gradient)
+        loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(regularizer - tf.constant(FLAGS.LH), tf.constant(0.0))
         tf.summary.scalar('losses/xe', loss_xe)
 
         ema = tf.train.ExponentialMovingAverage(decay=ema)

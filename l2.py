@@ -29,7 +29,7 @@ import tensorflow as tf
 
 FLAGS = flags.FLAGS
 
-# TODO : class name !!!
+
 class FSMixup(MultiModel):
 
     def augment(self, x, l, beta, **kwargs):
@@ -55,9 +55,10 @@ class FSMixup(MultiModel):
         logits_x = get_logits(x)
 
         loss_xe = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_x, logits=logits_x)
-        gradient = tf.gradients(loss_xe, x) # PLASE ADD COMMENTS.
+        gradient = tf.gradients(loss_xe, x)
         regularizer = tf.reduce_mean(tf.nn.l2_loss(gradient))
-        loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(regularizer, tf.square(FLAGS.LH))
+        loss_xe = tf.reduce_mean(loss_xe) + FLAGS.gamma*regularizer
+
         tf.summary.scalar('losses/xe', loss_xe)
 
         ema = tf.train.ExponentialMovingAverage(decay=ema)
@@ -114,7 +115,7 @@ if __name__ == '__main__':
     flags.DEFINE_integer('repeat', 4, 'Number of residual layers per stage.')
     flags.DEFINE_integer('nepoch', 1 << 7, 'Number of training epochs')
     flags.DEFINE_integer('epochsize', 1 << 16, 'Size of 1 epoch')
-    flags.DEFINE_float('LH', 1, 'Lipschitz upper bound')
+    flags.DEFINE_float('gamma', 1, 'Regularization hyperparameter')
     FLAGS.set_default('dataset', 'cifar10-1')
     FLAGS.set_default('batch', 64)
     FLAGS.set_default('lr', 0.002)
