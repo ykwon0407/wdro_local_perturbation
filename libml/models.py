@@ -19,7 +19,7 @@ from absl import flags
 from libml import layers
 from libml.train import Model_clf
 import tensorflow as tf
-
+from libml import spectral_norm as sn_layers
 
 class ConvNet(Model_clf):
     def classifier(self, x, scales, filters, getter=None, **kwargs):
@@ -118,10 +118,56 @@ class ShakeNet(Model_clf):
             logits = tf.layers.dense(y, self.nclass, kernel_initializer=tf.glorot_normal_initializer())
         return logits
 
+class SPNet(Model_clf):
+    '''
+    The same network architecture but without Batch normalization layers.
+    '''
 
-class MultiModel(ConvNet, ResNet, ShakeNet):
-    MODEL_CONVNET, MODEL_RESNET, MODEL_SHAKE = 'convnet resnet shake'.split()
-    MODELS = MODEL_CONVNET, MODEL_RESNET, MODEL_SHAKE
+    def classifier(self, x, scales, filters, repeat, training, getter=None, **kwargs):
+        del kwargs
+        leaky_relu = functools.partial(tf.nn.leaky_relu, alpha=0.1)
+        
+
+        def conv_args(k, f):
+            return dict(padding='same',
+                        kernel_initializer=tf.random_normal_initializer(stddev=tf.rsqrt(0.5 * k * k * f)))
+
+        def residual(x0, filters, stride=1, activate_before_residual=False):
+            x = leaky_relu(x0) # Without BNs
+            if activate_before_residual:
+                x0 = x
+
+            x = sn_layers.conv2d(x, filters, 3, strides=stride, name="conv2d-1")
+            x = leaky_relu(x) # Without BNs
+            x = sn_layers.conv2d(x, filters, 3, name="conv2d-2")
+
+            if x0.get_shape()[3] != filters:
+                x0 = sn_layers.conv2d(x0, filters, 1, strides=stride)
+
+            return x0 + x
+
+        with tf.variable_scope('classify', reuse=tf.AUTO_REUSE, custom_getter=getter):
+            # filters = 2*filters
+            # first_filter = 2*16
+
+            first_filter = 16
+
+            y = tf.layers.conv2d((x - self.dataset.mean) / self.dataset.std, first_filter, 3, **conv_args(3, first_filter))
+            for ind, scale in enumerate(range(scales)):
+                with tf.variable_scope('{}_layer_{}'.format(scale, ind)):
+                    y = residual(y, filters << scale, stride=2 if scale else 1, activate_before_residual=scale == 0)
+                with tf.variable_scope('{}_last_layer'.format(scale)):
+                    for i in range(repeat - 1):
+                        y = residual(y, filters << scale)
+
+            y = leaky_relu(y) # Without BNs
+            y = tf.reduce_mean(y, [1, 2])
+            logits = tf.layers.dense(y, self.nclass, kernel_initializer=tf.glorot_normal_initializer())
+        return logits
+
+class MultiModel(ConvNet, ResNet, ShakeNet, SPNet):
+    MODEL_CONVNET, MODEL_RESNET, MODEL_SHAKE, MODEL_SP = 'convnet resnet shake sp'.split()
+    MODELS = MODEL_CONVNET, MODEL_RESNET, MODEL_SHAKE, MODEL_SP
 
     def augment(self, x, l, smoothing, **kwargs):
         del kwargs
@@ -134,8 +180,9 @@ class MultiModel(ConvNet, ResNet, ShakeNet):
             return ResNet.classifier(self, x, **kwargs)
         elif arch == self.MODEL_SHAKE:
             return ShakeNet.classifier(self, x, **kwargs)
+        elif arch == self.MODEL_SP:
+            return SPNet.classifier(self, x, **kwargs)
         raise ValueError('Model %s does not exists, available ones are %s' % (arch, self.MODELS))
-
 
 # default architecture is RESNET.
 flags.DEFINE_enum('arch', MultiModel.MODEL_RESNET, MultiModel.MODELS, 'Architecture.') 
