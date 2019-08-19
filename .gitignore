@@ -13,6 +13,7 @@ __pycache__/
 .ipynb
 .ipynb_checkpoints
 */.ipynb_checkpoints/*
+!make_figures.ipynb
 
 ### macOS ###
 # General
