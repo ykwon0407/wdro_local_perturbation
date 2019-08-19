@@ -57,8 +57,7 @@ class FSMixup(MultiModel):
         loss_xe = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_x, logits=logits_x)
         gradient = tf.gradients(loss_xe, x)
         regularizer = tf.reduce_mean(tf.nn.l2_loss(gradient))
-        loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(regularizer, tf.square(FLAGS.LH))
-
+        loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(regularizer - tf.square(FLAGS.LH), tf.constant(0.0))
         tf.summary.scalar('losses/xe', loss_xe)
 
         ema = tf.train.ExponentialMovingAverage(decay=ema)
