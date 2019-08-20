@@ -29,7 +29,7 @@ import tensorflow as tf
 
 FLAGS = flags.FLAGS
 
-# TODO : class name !!!
+
 class FSMixup(MultiModel):
 
     def augment(self, x, l, beta, **kwargs):
@@ -40,7 +40,7 @@ class FSMixup(MultiModel):
         lmix = l * mix[:, :, 0, 0] + l[::-1] * (1 - mix[:, :, 0, 0])
         return xmix, lmix
 
-    def model(self, lr, wd, ema, **kwargs):
+    def model(self, lr, wd, ema, regularizer, **kwargs):
         hwc = [self.dataset.height, self.dataset.width, self.dataset.colors]
         x_in = tf.placeholder(tf.float32, [None] + hwc, 'x')
         l_in = tf.placeholder(tf.int32, [None], 'labels')
@@ -53,11 +53,21 @@ class FSMixup(MultiModel):
 
         x, labels_x = self.augment(x_in, tf.one_hot(l_in, self.nclass), **kwargs)
         logits_x = get_logits(x)
-
-        loss_xe = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_x, logits=logits_x)
-        gradient = tf.gradients(loss_xe, x) # PLASE ADD COMMENTS.
-        regularizer = tf.reduce_mean(tf.nn.l2_loss(gradient))
-        loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(regularizer, tf.square(FLAGS.LH))
+        loss_xe = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_x, logits=logits_x) #shape = (batchsize,)
+        
+        if regularizer == 'maxsup':
+            gradient = tf.gradients(loss_xe, x)[0] #output is list
+            loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(tf.reduce_max(tf.abs(gradient)) - tf.constant(FLAGS.LH), tf.constant(0.0))
+        elif regularizer == 'maxl2':
+            gradient = tf.gradients(loss_xe, x)[0] #output is list
+            loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32) - tf.square(FLAGS.LH), tf.constant(0.0))
+        elif regularizer == 'l2':
+            gradient = tf.gradients(loss_xe, x)[0] #output is list
+            loss_xe = tf.reduce_mean(loss_xe) + FLAGS.gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
+        else:
+            assert regularizer == 'None', 'unavailable regularizer, (maxsup, maxl2, l2, None)'
+            loss_xe = tf.reduce_mean(loss_xe)
+            
         tf.summary.scalar('losses/xe', loss_xe)
 
         ema = tf.train.ExponentialMovingAverage(decay=ema)
@@ -96,6 +106,7 @@ def main(argv):
         nclass=dataset.nclass,
         ema=FLAGS.ema,
         beta=FLAGS.beta,
+        regularizer=FLAGS.regularizer,
 
         scales=FLAGS.scales or (log_width - 2),
         filters=FLAGS.filters,
@@ -115,6 +126,8 @@ if __name__ == '__main__':
     flags.DEFINE_integer('nepoch', 1 << 7, 'Number of training epochs')
     flags.DEFINE_integer('epochsize', 1 << 16, 'Size of 1 epoch')
     flags.DEFINE_float('LH', 1, 'Lipschitz upper bound')
+    flags.DEFINE_float('gamma', 1, 'Regularization parameter')
+    flags.DEFINE_string('regularizer', 'None', 'Type of regularizer: None, maxsup, maxl2, l2')
     FLAGS.set_default('dataset', 'cifar10-1')
     FLAGS.set_default('batch', 64)
     FLAGS.set_default('lr', 0.002)
