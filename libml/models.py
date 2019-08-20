@@ -63,16 +63,19 @@ class ResNet(Model_clf):
 
         with tf.variable_scope('classify', reuse=tf.AUTO_REUSE, custom_getter=getter):
             y = tf.layers.conv2d((x - self.dataset.mean) / self.dataset.std, 16, 3, **conv_args(3, 16))
+            
             for scale in range(scales):
-                y = residual(y, filters << scale, stride=2 if scale else 1, activate_before_residual=scale == 0)
+                with tf.variable_scope('{}_layer_0'.format(scale)):
+                    y = residual(y, filters << scale, stride=2 if scale else 1, activate_before_residual=scale == 0)
+                
                 for i in range(repeat - 1):
-                    y = residual(y, filters << scale)
-
+                    with tf.variable_scope('{}_layer_{}'.format(scale, str(i+1))):
+                        y = residual(y, filters << scale)
+            
             y = leaky_relu(tf.layers.batch_normalization(y, **bn_args))
             y = tf.reduce_mean(y, [1, 2])
             logits = tf.layers.dense(y, self.nclass, kernel_initializer=tf.glorot_normal_initializer())
         return logits
-
 
 class ShakeNet(Model_clf):
     def classifier(self, x, scales, filters, repeat, training, getter=None, **kwargs):
@@ -120,53 +123,59 @@ class ShakeNet(Model_clf):
 
 class SPNet(Model_clf):
     '''
-    The same network architecture but without Batch normalization layers.
+    The same network architecture with ResNet but with Spectral normalization layers.
     '''
 
-    def classifier(self, x, scales, filters, repeat, training, getter=None, **kwargs):
+    def classifier(self, x, scales, filters, repeat, training, BN=False, getter=None, **kwargs):
         del kwargs
         leaky_relu = functools.partial(tf.nn.leaky_relu, alpha=0.1)
-        
+        bn_args = dict(training=training, momentum=0.999)
 
         def conv_args(k, f):
             return dict(padding='same',
                         kernel_initializer=tf.random_normal_initializer(stddev=tf.rsqrt(0.5 * k * k * f)))
 
         def residual(x0, filters, stride=1, activate_before_residual=False):
-            x = leaky_relu(x0) # Without BNs
+            if BN is True:
+                x = leaky_relu(tf.layers.batch_normalization(x0, **bn_args))
+            else:
+                x = leaky_relu(x0)
             if activate_before_residual:
                 x0 = x
 
-            x = sn_layers.conv2d(x, filters, 3, strides=stride, name="conv2d-1")
-            x = leaky_relu(x) # Without BNs
-            x = sn_layers.conv2d(x, filters, 3, name="conv2d-2")
+            x = sn_layers.conv2d(x, filters, 3, strides=stride, name="conv_0")
+            if BN is True:
+                x = leaky_relu(tf.layers.batch_normalization(x, **bn_args))
+            else:
+                x = leaky_relu(x)
+            x = sn_layers.conv2d(x, filters, 3, name="conv_1")
 
             if x0.get_shape()[3] != filters:
-                x0 = sn_layers.conv2d(x0, filters, 1, strides=stride)
+                x0 = sn_layers.conv2d(x0, filters, 1, strides=stride, name="conv_2")
 
             return x0 + x
-
+            
         with tf.variable_scope('classify', reuse=tf.AUTO_REUSE, custom_getter=getter):
-            # filters = 2*filters
-            # first_filter = 2*16
+            y = tf.layers.conv2d((x - self.dataset.mean) / self.dataset.std, 16, 3, **conv_args(3, 16))
 
-            first_filter = 16
-
-            y = tf.layers.conv2d((x - self.dataset.mean) / self.dataset.std, first_filter, 3, **conv_args(3, first_filter))
-            for ind, scale in enumerate(range(scales)):
-                with tf.variable_scope('{}_layer_{}'.format(scale, ind)):
+            for scale in range(scales):
+                with tf.variable_scope('{}_layer_0'.format(scale)):
                     y = residual(y, filters << scale, stride=2 if scale else 1, activate_before_residual=scale == 0)
-                with tf.variable_scope('{}_last_layer'.format(scale)):
-                    for i in range(repeat - 1):
+                
+                for i in range(repeat - 1):
+                    with tf.variable_scope('{}_layer_{}'.format(scale, str(i+1))):
                         y = residual(y, filters << scale)
-
-            y = leaky_relu(y) # Without BNs
+                        
+            if BN is True:
+                y = leaky_relu(tf.layers.batch_normalization(y, **bn_args))
+            else:
+                y = leaky_relu(y)
             y = tf.reduce_mean(y, [1, 2])
             logits = tf.layers.dense(y, self.nclass, kernel_initializer=tf.glorot_normal_initializer())
         return logits
 
 class MultiModel(ConvNet, ResNet, ShakeNet, SPNet):
-    MODEL_CONVNET, MODEL_RESNET, MODEL_SHAKE, MODEL_SP = 'convnet resnet shake sp'.split()
+    MODEL_CONVNET, MODEL_RESNET, MODEL_SHAKE, MODEL_SP = 'convnet resnet shake spnet'.split()
     MODELS = MODEL_CONVNET, MODEL_RESNET, MODEL_SHAKE, MODEL_SP
 
     def augment(self, x, l, smoothing, **kwargs):
@@ -188,3 +197,41 @@ class MultiModel(ConvNet, ResNet, ShakeNet, SPNet):
 flags.DEFINE_enum('arch', MultiModel.MODEL_RESNET, MultiModel.MODELS, 'Architecture.') 
 
 
+
+"""
+class ResNet_ORIGINAL(Model_clf):
+    def classifier(self, x, scales, filters, repeat, training, getter=None, **kwargs):
+        del kwargs
+        leaky_relu = functools.partial(tf.nn.leaky_relu, alpha=0.1)
+        bn_args = dict(training=training, momentum=0.999)
+
+        def conv_args(k, f):
+            return dict(padding='same',
+                        kernel_initializer=tf.random_normal_initializer(stddev=tf.rsqrt(0.5 * k * k * f)))
+
+        def residual(x0, filters, stride=1, activate_before_residual=False):
+            x = leaky_relu(tf.layers.batch_normalization(x0, **bn_args))
+            if activate_before_residual:
+                x0 = x
+
+            x = tf.layers.conv2d(x, filters, 3, strides=stride, **conv_args(3, filters))
+            x = leaky_relu(tf.layers.batch_normalization(x, **bn_args))
+            x = tf.layers.conv2d(x, filters, 3, **conv_args(3, filters))
+
+            if x0.get_shape()[3] != filters:
+                x0 = tf.layers.conv2d(x0, filters, 1, strides=stride, **conv_args(1, filters))
+
+            return x0 + x
+
+        with tf.variable_scope('classify', reuse=tf.AUTO_REUSE, custom_getter=getter):
+            y = tf.layers.conv2d((x - self.dataset.mean) / self.dataset.std, 16, 3, **conv_args(3, 16))
+            for scale in range(scales):
+                y = residual(y, filters << scale, stride=2 if scale else 1, activate_before_residual=scale == 0)
+                for i in range(repeat - 1):
+                    y = residual(y, filters << scale)
+
+            y = leaky_relu(tf.layers.batch_normalization(y, **bn_args))
+            y = tf.reduce_mean(y, [1, 2])
+            logits = tf.layers.dense(y, self.nclass, kernel_initializer=tf.glorot_normal_initializer())
+        return logits
+"""        

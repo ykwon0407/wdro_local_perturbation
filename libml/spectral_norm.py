@@ -13,7 +13,7 @@ def spectral_normed_weight(w,
     w_reshaped = tf.reshape(w, w_new_shape, name='w_reshaped')
     
     if u is None:
-        u = tf.get_variable("u_vec", [w_new_shape[0], 1], initializer=tf.random_normal_initializer, trainable=False)
+        u = tf.get_variable("u_vec", [w_new_shape[0], 1], initializer=tf.random_normal_initializer(), trainable=False)
     
     # power iteration
     u_ = u
@@ -60,17 +60,17 @@ def conv2d(inputs,
         w = tf.get_variable("w_{}".format(name), 
             shape=[k_size, k_size, inputs.get_shape()[-1], filters], 
             dtype=tf.float32,
-            initializer=None
+            initializer=tf.random_normal_initializer(stddev=tf.rsqrt(0.5 * k_size * k_size * filters))
             )
         
         if spectral_normed:
             w = spectral_normed_weight(w)
         
-        conv = tf.nn.conv2d(inputs, w, strides=strides, padding=padding.upper())
+        conv = tf.nn.conv2d(inputs, w, strides=strides, padding=padding.upper(), name="conv_w_{}".format(name))
         
         if use_bias:
-            biases = tf.get_variable("b", [filters], initializer=tf.constant_initializer(0.0))
-            conv = tf.nn.bias_add(conv, biases, name="conv_add_b")
+            biases = tf.get_variable("b_{}".format(name), [filters], initializer=tf.constant_initializer(0.0))
+            conv = tf.nn.bias_add(conv, biases, name="conv_add_b_{}".format(name))
         
         return conv
 

@@ -1,10 +1,11 @@
 session_name: sp_regularization
 windows:
         - window_name: sp_regularization
-          layout: even-vertical
+          layout: even-horizontal
           shell_command_before: cd ~/deep/project/dro-id/
           panes:
-                  - CUDA_VISIBLE_DEVICES=0 python3 sp_regularization.py --train_dir experiments/test --dataset=cifar10.1@50000-1 --nepoch 50
-                  - CUDA_VISIBLE_DEVICES=2 python3 sp_regularization.py --train_dir experiments/test --dataset=cifar100.1@50000-1 --nepoch 50
-                  - CUDA_VISIBLE_DEVICES=3 python3 mixup.py --train_dir experiments/test --dataset=cifar100.1@50000-1 --nepoch 50
+                  - sh runs/yc_test.sh
+                  # - CUDA_VISIBLE_DEVICES=0 python3 sp_regularization.py --train_dir experiments/test --dataset=cifar10.1@50000-1 --nepoch 50
+                  # - CUDA_VISIBLE_DEVICES=2 python3 sp_regularization.py --train_dir experiments/test --dataset=cifar100.1@50000-1 --nepoch 50
+                  # - CUDA_VISIBLE_DEVICES=3 python3 mixup.py --train_dir experiments/test --dataset=cifar10.1@50000-1 --nepoch 50
                   

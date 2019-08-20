@@ -55,9 +55,7 @@ class SP_REG(MultiModel):
         logits_x = get_logits(x)
 
         loss_xe = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_x, logits=logits_x)
-        gradient = tf.gradients(loss_xe, x)
-        regularizer = tf.nn.l2_loss(gradient)
-        loss_xe = tf.reduce_mean(loss_xe + FLAGS.gamma*regularizer)
+        loss_xe = tf.reduce_mean(loss_xe)
         tf.summary.scalar('losses/xe', loss_xe)
 
         ema = tf.train.ExponentialMovingAverage(decay=ema)
@@ -96,6 +94,7 @@ def main(argv):
         nclass=dataset.nclass,
         ema=FLAGS.ema,
         beta=FLAGS.beta,
+        BN=FLAGS.BN,
         scales=FLAGS.scales or (log_width - 2),
         filters=FLAGS.filters,
         repeat=FLAGS.repeat)
@@ -113,10 +112,12 @@ if __name__ == '__main__':
     flags.DEFINE_integer('repeat', 4, 'Number of residual layers per stage.')
     flags.DEFINE_integer('nepoch', 1 << 7, 'Number of training epochs')
     flags.DEFINE_integer('epochsize', 1 << 16, 'Size of 1 epoch')
-    flags.DEFINE_integer('gamma', 1, 'Regularization hyperparameter')
-    FLAGS.set_default('arch', 'sp')
+    flags.DEFINE_boolean('BN', False, 'Are BNs used?')
+    FLAGS.set_default('arch', 'spnet')
     FLAGS.set_default('dataset', 'cifar10-1')
     FLAGS.set_default('batch', 64)
     FLAGS.set_default('lr', 0.002)
     #FLAGS.set_default('train_kimg', 1 << 16)
     app.run(main)
+
+
