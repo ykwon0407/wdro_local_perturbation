@@ -140,7 +140,9 @@ class Model_clf(Model):
         Model.__init__(self, train_dir, dataset, nclass=nclass, **kwargs)
 
     def train_step(self, train_session, data_labeled):
+        # Load data
         x = self.session.run(data_labeled)
+        # Update parameters
         self.tmp.step = train_session.run([self.ops.train_op, self.ops.update_step],
                                           feed_dict={self.ops.x: x['image'],
                                                      self.ops.label: x['label']})[1]
