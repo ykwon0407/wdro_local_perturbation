@@ -1,0 +1,35 @@
+*.iml
+*.tfrecord
+*.json
+.idea
+3rdparty/
+
+gpumux/
+ML_DATA/
+__pycache__/
+
+experiments/
+
+### JupyterNotebook ###
+*.ipynb
+*.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+!make_figures.ipynb
+!make_figures_yc.ipynb
+
+### macOS ###
+# General
+.DS_Store
+.AppleDouble
+.LSOverride
+
+### Python ###
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+TODO_LIST
+
+
