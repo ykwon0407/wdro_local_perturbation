@@ -30,7 +30,7 @@ import tensorflow as tf
 FLAGS = flags.FLAGS
 
 
-class FSMixup(MultiModel):
+class FSgradient(MultiModel):
 
     def augment(self, x, l, beta, **kwargs):
         del kwargs
@@ -40,7 +40,7 @@ class FSMixup(MultiModel):
         lmix = l * mix[:, :, 0, 0] + l[::-1] * (1 - mix[:, :, 0, 0])
         return xmix, lmix
 
-    def model(self, lr, wd, ema, regularizer, **kwargs):
+    def model(self, lr, wd, ema, regularizer, gamma, LH, **kwargs):
         hwc = [self.dataset.height, self.dataset.width, self.dataset.colors]
         x_in = tf.placeholder(tf.float32, [None] + hwc, 'x')
         l_in = tf.placeholder(tf.int32, [None], 'labels')
@@ -57,13 +57,13 @@ class FSMixup(MultiModel):
         
         if regularizer == 'maxsup':
             gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(tf.reduce_max(tf.abs(gradient)) - tf.constant(FLAGS.LH), tf.constant(0.0))
+            loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(tf.reduce_max(tf.abs(gradient)) - tf.constant(LH), tf.constant(0.0))
         elif regularizer == 'maxl2':
             gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32) - tf.square(FLAGS.LH), tf.constant(0.0))
+            loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32) - tf.square(LH), tf.constant(0.0))
         elif regularizer == 'l2':
             gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_xe = tf.reduce_mean(loss_xe) + FLAGS.gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
+            loss_xe = tf.reduce_mean(loss_xe) + gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
         else:
             assert regularizer == 'None', 'unavailable regularizer, (maxsup, maxl2, l2, None)'
             loss_xe = tf.reduce_mean(loss_xe)
@@ -96,7 +96,7 @@ def main(argv):
     del argv  # Unused.
     dataset = DATASETS[FLAGS.dataset]()
     log_width = utils.ilog2(dataset.width)
-    model = FSMixup(
+    model = FSgradient(
         os.path.join(FLAGS.train_dir, dataset.name),
         dataset,
         lr=FLAGS.lr,
@@ -107,6 +107,8 @@ def main(argv):
         ema=FLAGS.ema,
         beta=FLAGS.beta,
         regularizer=FLAGS.regularizer,
+        gamma=FLAGS.gamma,
+        LH=FLAGS.LH,
 
         scales=FLAGS.scales or (log_width - 2),
         filters=FLAGS.filters,
