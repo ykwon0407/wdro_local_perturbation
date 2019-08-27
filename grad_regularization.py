@@ -57,18 +57,26 @@ class FSgradient(MultiModel):
         
         if regularizer == 'maxsup':
             gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(tf.reduce_max(tf.abs(gradient)) - tf.constant(LH), tf.constant(0.0))
+            loss_main = tf.reduce_mean(loss_xe)
+            loss_grad = tf.maximum(tf.reduce_max(tf.abs(gradient)) - tf.constant(LH), tf.constant(0.0))
         elif regularizer == 'maxl2':
             gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_xe = tf.reduce_mean(loss_xe) + tf.maximum(tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32) - tf.square(LH), tf.constant(0.0))
+            loss_main = tf.reduce_mean(loss_xe)
+            loss_grad = tf.maximum(tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32) - tf.square(LH), tf.constant(0.0))
         elif regularizer == 'l2':
             gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_xe = tf.reduce_mean(loss_xe) + gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
+            loss_main = tf.reduce_mean(loss_xe)
+            loss_grad = gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
         else:
+            # Same with mixup
             assert regularizer == 'None', 'unavailable regularizer, (maxsup, maxl2, l2, None)'
-            loss_xe = tf.reduce_mean(loss_xe)
+            loss_main = tf.reduce_mean(loss_xe)
+            loss_grad = 0
             
-        tf.summary.scalar('losses/xe', loss_xe)
+        tf.summary.scalar('losses/main', loss_main)
+        tf.summary.scalar('losses/gradient', loss_grad)
+        tf.summary.scalar('gradient/max_gradient', tf.reduce_max(tf.abs(gradient)))
+        loss_xe = loss_main + loss_grad
 
         ema = tf.train.ExponentialMovingAverage(decay=ema)
         ema_op = ema.apply(utils.model_vars())
