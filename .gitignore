@@ -4,6 +4,7 @@
 .idea
 3rdparty/
 
+data/
 gpumux/
 ML_DATA/
 __pycache__/
