@@ -16,6 +16,7 @@
 import json
 import os.path
 import shutil
+import functools
 
 import numpy as np
 import tensorflow as tf
@@ -120,9 +121,14 @@ class Model:
             ckpt = utils.find_latest_checkpoint(self.checkpoint_dir)
         else:
             ckpt = os.path.abspath(ckpt)
+            if os.path.exists(ckpt):
+                print('Eval model at %s' % ckpt)
+            else:
+                print('The cpkt_eval does not exists... Searching the latest checkpoint')
+                ckpt = utils.find_latest_checkpoint(self.checkpoint_dir)
         saver.restore(self.session, ckpt)
         self.tmp.step = self.session.run(self.step)
-        print('Eval model %s at global_step %d' % (self.__class__.__name__, self.tmp.step))
+        print('Eval model %s at global_step %d imgs' % (self.__class__.__name__, self.tmp.step))
         return self
 
     def model(self, **kwargs):
@@ -198,15 +204,17 @@ class Model_clf(Model):
         self.eval_mode(ckpt)
         self.cache_eval()
         raw = self.eval_stats(classify_op=self.ops.classify_raw)
-        ema = self.eval_stats(classify_op=self.ops.classify_op)
-        self.tune(16384)
-        tuned_raw = self.eval_stats(classify_op=self.ops.classify_raw)
-        tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
+        #ema = self.eval_stats(classify_op=self.ops.classify_op)
+        lipschitz = self.eval_lipschitz(sup_gradient=self.ops.sup_gradient)
+        #self.tune(16384)
+        #tuned_raw = self.eval_stats(classify_op=self.ops.classify_raw)
+        #tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
         print('%16s %8s %8s %8s' % (('raw',) + tuple('%.2f' % x for x in raw)))
-        print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
-        print('%16s %8s %8s %8s' % (('tuned_raw',) + tuple('%.2f' % x for x in tuned_raw)))
-        print('%16s %8s %8s %8s' % (('tuned_ema',) + tuple('%.2f' % x for x in tuned_ema)))
+        print('%16s %8s %8s %8s' % (('Lipschitz', '%.2f' % lipschitz, '', '')))
+        #print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
+        #print('%16s %8s %8s %8s' % (('tuned_raw',) + tuple('%.2f' % x for x in tuned_raw)))
+        #print('%16s %8s %8s %8s' % (('tuned_ema',) + tuple('%.2f' % x for x in tuned_ema)))
 
     def cache_eval(self):
         """Cache datasets for computing eval stats."""
@@ -240,24 +248,52 @@ class Model_clf(Model):
         for subset in ('train_labeled', 'valid', 'test'):
             images, labels = self.tmp.cache[subset]
             predicted = []
-
             for x in range(0, images.shape[0], batch):
                 p = self.session.run(
                     classify_op,
                     feed_dict={
                         self.ops.x: images[x:x + batch],
                         **(feed_extra or {})
-                    })
+                    })   
                 predicted.append(p)
             predicted = np.concatenate(predicted, axis=0)
             accuracies.append((predicted.argmax(1) == labels).mean() * 100)
+        #print accuracies
         self.train_print('%-5d k imgs  accuracy train/valid/test  %.2f  %.2f  %.2f' %
                          tuple([self.tmp.step >> 10] + accuracies))
         self.accuracies['epoch' + str(self.tmp.step // FLAGS.epochsize)] = accuracies
+        #Saving accurcies.txt
+        if FLAGS.eval_ckpt:
+            return np.array(accuracies, 'f')
         with open(os.path.join(self.train_dir, 'accuracies.txt'), 'w') as outfile:
             json.dump(self.accuracies, outfile)
-        #print(accuracies)
         return np.array(accuracies, 'f')
+
+    def eval_lipschitz(self, batch=None, feed_extra=None, sup_gradient=None):
+        """Evaluate lipchitz constant of h(x,y)=loss(f(x),y) on test images."""
+        batch = batch or FLAGS.batch
+        sup_gradient = self.ops.sup_gradient if sup_gradient is None else sup_gradient        
+        predicted = []
+        x_test, y_test = self.tmp.cache['test']
+        for i in range(0, x_test.shape[0], batch):
+            l = self.session.run(
+                sup_gradient,
+                feed_dict={
+                    self.ops.x: x_test[i:i+batch],
+                    self.ops.label: y_test[i:i+batch],
+                    **(feed_extra or {})
+                })
+            predicted.append(l)
+        predicted = np.concatenate(predicted, axis=0)
+        #print(predicted)
+        lipschitz = np.max(predicted)
+        #print(predicted.shape) (n_test, )
+
+        #Saving lipschitz.txt
+        with open(os.path.join(self.train_dir, 'lipschitz.txt'), 'w') as outfile:
+            json.dump({'lipschitz':str(lipschitz)}, outfile)
+        return lipschitz
+
 
     def add_summaries(self, feed_extra=None, **kwargs):
         del kwargs

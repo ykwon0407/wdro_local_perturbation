@@ -11,7 +11,7 @@ for seed in 1 2 3 4 5; do
     CUDA_VISIBLE_DEVICES=1 python3 grad_regularization.py --train_dir experiments/l2_0.0025_10@${size} --dataset=cifar10.${seed}@${size}-1 --gamma 0.0025 $common_args
     done
 done
-&
+
 # CIFAR 100
 #for seed in 1 2 3 4 5; do
 #    for size in 1000 2500 5000 25000 50000; do
