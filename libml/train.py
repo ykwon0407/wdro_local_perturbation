@@ -291,7 +291,7 @@ class Model_clf(Model):
 
         #Saving lipschitz.txt
         with open(os.path.join(self.train_dir, 'lipschitz.txt'), 'w') as outfile:
-            json.dump({'lipschitz':str(lipschitz)}, outfile)
+            json.dump({'lipschitz': lipschitz}, outfile)
         return lipschitz
 
 
