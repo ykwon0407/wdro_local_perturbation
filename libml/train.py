@@ -211,7 +211,7 @@ class Model_clf(Model):
         #tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
         print('%16s %8s %8s %8s' % (('raw',) + tuple('%.2f' % x for x in raw)))
-        print('%16s %8s %8s %8s' % (('Lipschitz', '%.2f' % lipschitz, '', '')))
+        #print('%16s %8s %8s %8s' % (('Lipschitz', '%.2f' % lipschitz, '', '')))
         #print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
         #print('%16s %8s %8s %8s' % (('tuned_raw',) + tuple('%.2f' % x for x in tuned_raw)))
         #print('%16s %8s %8s %8s' % (('tuned_ema',) + tuple('%.2f' % x for x in tuned_ema)))
@@ -286,13 +286,13 @@ class Model_clf(Model):
             predicted.append(l)
         predicted = np.concatenate(predicted, axis=0)
         #print(predicted)
-        lipschitz = predicted
+        #lipschitz = predicted
         #print(predicted.shape) (n_test, )
 
         #Saving lipschitz.txt
-        with open(os.path.join(self.train_dir, 'lipschitz.txt'), 'w') as outfile:
-            json.dump({'lipschitz': lipschitz}, outfile)
-        return lipschitz
+        with open(os.path.join(self.train_dir, 'gradients.txt'), 'w') as outfile:
+            json.dump({'gradients': predicted.tolist()}, outfile)
+        return predicted
 
 
     def add_summaries(self, feed_extra=None, **kwargs):
