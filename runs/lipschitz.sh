@@ -1,6 +1,6 @@
 #!/bin/bash
 
-cd ~/Desktop/dro-id/
+cd ~/deep/project/dro-id/
 common_args="--eval_ckpt 1 --regularizer l2"
 
 # CIFAR 10
