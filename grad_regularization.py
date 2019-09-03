@@ -116,7 +116,7 @@ def main(argv):
         beta=FLAGS.beta,
         regularizer=FLAGS.regularizer,
         gamma=FLAGS.gamma,
-        LH=FLAGS.LH,
+        LH=float(FLAGS.LH),
 
         scales=FLAGS.scales or (log_width - 2),
         filters=FLAGS.filters,

@@ -75,7 +75,13 @@ class Model:
         print()
         print(fmt % to_print[-1])
         print('-' * 80)
-        self._create_initial_files()
+        if not FLAGS.eval_ckpt: 
+            self._create_initial_files()
+        else:
+            print('-'*50)
+            print('Evaluation mode')
+            print('-'*50)
+            pass
 
     @property
     def arg_dir(self):
@@ -123,9 +129,11 @@ class Model:
             ckpt = os.path.abspath(ckpt)
             if os.path.exists(ckpt):
                 print('Eval model at %s' % ckpt)
+                ckpt = utils.find_latest_checkpoint(os.path.join(ckpt, 'tf'))
             else:
                 print('The cpkt_eval does not exists... Searching the latest checkpoint')
                 ckpt = utils.find_latest_checkpoint(self.checkpoint_dir)
+            print('The cpkt path is : ', ckpt)
         saver.restore(self.session, ckpt)
         self.tmp.step = self.session.run(self.step)
         print('Eval model %s at global_step %d imgs' % (self.__class__.__name__, self.tmp.step))
