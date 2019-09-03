@@ -293,9 +293,6 @@ class Model_clf(Model):
                 })
             predicted.append(l)
         predicted = np.concatenate(predicted, axis=0)
-        #print(predicted)
-        #lipschitz = predicted
-        #print(predicted.shape) (n_test, )
 
         #Saving lipschitz.txt
         with open(os.path.join(self.train_dir, 'gradients.txt'), 'w') as outfile:
