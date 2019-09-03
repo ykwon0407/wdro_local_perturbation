@@ -54,23 +54,18 @@ class FSgradient(MultiModel):
         x, labels_x = self.augment(x_in, tf.one_hot(l_in, self.nclass), **kwargs)
         logits_x = get_logits(x)
         loss_xe = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_x, logits=logits_x) #shape = (batchsize,)
-        
+        gradient = tf.gradients(loss_xe, x)[0] #output is list (batchsize, height, width, colors)
+        loss_main = tf.reduce_mean(loss_xe)        
+
         if regularizer == 'maxsup':
-            gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_main = tf.reduce_mean(loss_xe)
             loss_grad = tf.maximum(tf.reduce_max(tf.abs(gradient)) - tf.constant(LH), tf.constant(0.0))
         elif regularizer == 'maxl2':
-            gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_main = tf.reduce_mean(loss_xe)
             loss_grad = tf.maximum(tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32) - tf.square(LH), tf.constant(0.0))
         elif regularizer == 'l2':
-            gradient = tf.gradients(loss_xe, x)[0] #output is list
-            loss_main = tf.reduce_mean(loss_xe)
             loss_grad = gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
         else:
             # Same with mixup
             assert regularizer == 'None', 'unavailable regularizer, (maxsup, maxl2, l2, None)'
-            loss_main = tf.reduce_mean(loss_xe)
             loss_grad = 0
             
         tf.summary.scalar('losses/main', loss_main)
@@ -78,6 +73,10 @@ class FSgradient(MultiModel):
         tf.summary.scalar('gradient/max_gradient', tf.reduce_max(tf.abs(gradient)))
         loss_xe = loss_main + loss_grad
 
+        #For lipschitz
+        sup_gradient = tf.reduce_max(tf.abs(gradient), axis=[1,2,3]) #(batchsize, )
+
+        #EMA part
         ema = tf.train.ExponentialMovingAverage(decay=ema)
         ema_op = ema.apply(utils.model_vars())
         ema_getter = functools.partial(utils.getter_ema, ema)
@@ -97,7 +96,8 @@ class FSgradient(MultiModel):
         return EasyDict(
             x=x_in, label=l_in, train_op=train_op, tune_op=train_bn,
             classify_raw=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA, for debugging.
-            classify_op=tf.nn.softmax(classifier(x_in, getter=ema_getter, training=False)))
+            classify_op=tf.nn.softmax(classifier(x_in, getter=ema_getter, training=False)),
+            sup_gradient = sup_gradient)
 
 
 def main(argv):

@@ -12,7 +12,7 @@ __pycache__/
 experiments/
 
 ### JupyterNotebook ###
-*.ipynb
+no_*.ipynb
 *.ipynb_checkpoints
 */.ipynb_checkpoints/*
 !make_figures.ipynb
