@@ -1,9 +1,0 @@
-session_name: grad_regularization_max
-windows:
-        - window_name: grad_regularization_max
-          layout: even-horizontal
-          shell_command_before: cd ~/deep/project/dro-id/
-          panes:
-                  - sh runs/yc_max_10.sh
-                  - sh runs/yc_max_100.sh
-                  

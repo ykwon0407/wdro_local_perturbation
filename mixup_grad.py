@@ -30,7 +30,7 @@ import tensorflow as tf
 FLAGS = flags.FLAGS
 
 
-class FSgradient(MultiModel):
+class MixupGrad(MultiModel):
 
     def augment(self, x, l, beta, **kwargs):
         del kwargs
@@ -55,7 +55,7 @@ class FSgradient(MultiModel):
         logits_x = get_logits(x)
         loss_xe = tf.nn.softmax_cross_entropy_with_logits_v2(labels=labels_x, logits=logits_x) #shape = (batchsize,)
         gradient = tf.gradients(loss_xe, x)[0] #output is list (batchsize, height, width, colors)
-        loss_main = tf.reduce_mean(loss_xe)        
+        loss_main = tf.reduce_mean(loss_xe)
 
         if regularizer == 'maxsup':
             loss_grad = tf.maximum(tf.reduce_max(tf.abs(gradient)) - tf.constant(LH), tf.constant(0.0))
@@ -63,10 +63,11 @@ class FSgradient(MultiModel):
             loss_grad = tf.maximum(tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32) - tf.square(LH), tf.constant(0.0))
         elif regularizer == 'l2':
             loss_grad = gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
-        else:
+        elif regularizer == 'None':
             # Same with mixup
-            assert regularizer == 'None', 'unavailable regularizer, (maxsup, maxl2, l2, None)'
-            loss_grad = 0
+            loss_grad = tf.constant(0.0)
+        else:
+            assert False, 'unavailable regularizer, (maxsup, maxl2, l2, None)'
             
         tf.summary.scalar('losses/main', loss_main)
         tf.summary.scalar('losses/gradient', loss_grad)
@@ -77,34 +78,53 @@ class FSgradient(MultiModel):
         sup_gradient = tf.reduce_max(tf.abs(gradient), axis=[1,2,3]) #(batchsize, )
 
         #EMA part
-        ema = tf.train.ExponentialMovingAverage(decay=ema)
-        ema_op = ema.apply(utils.model_vars())
-        ema_getter = functools.partial(utils.getter_ema, ema)
-        post_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) + [ema_op]
-        post_ops.extend([tf.assign(v, v * (1 - wd)) for v in utils.model_vars('classify') if 'kernel' in v.name])
+        if ema > 0 :
+            ema = tf.train.ExponentialMovingAverage(decay=ema)
+            ema_op = ema.apply(utils.model_vars())
+            ema_getter = functools.partial(utils.getter_ema, ema)
+            post_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) + [ema_op]
+            post_ops.extend([tf.assign(v, v * (1 - wd)) for v in utils.model_vars('classify') if 'kernel' in v.name])
 
-        train_op = tf.train.AdamOptimizer(lr).minimize(loss_xe, colocate_gradients_with_ops=True)
-        with tf.control_dependencies([train_op]):
-            train_op = tf.group(*post_ops)
+            train_op = tf.train.AdamOptimizer(lr).minimize(loss_xe, colocate_gradients_with_ops=True)
+            with tf.control_dependencies([train_op]):
+                train_op = tf.group(*post_ops)
 
-        # Tuning op: only retrain batch norm.
-        skip_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        classifier(x_in, training=True)
-        train_bn = tf.group(*[v for v in tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-                              if v not in skip_ops])
+            # Tuning op: only retrain batch norm.
+            skip_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            classifier(x_in, training=True)
+            train_bn = tf.group(*[v for v in tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                                  if v not in skip_ops])
 
-        return EasyDict(
-            x=x_in, label=l_in, train_op=train_op, tune_op=train_bn,
-            classify_raw=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA, for debugging.
-            classify_op=tf.nn.softmax(classifier(x_in, getter=ema_getter, training=False)),
-            sup_gradient = sup_gradient)
+            return EasyDict(
+                x=x_in, label=l_in, train_op=train_op, tune_op=train_bn,
+                classify_raw=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA, for debugging.
+                classify_op=tf.nn.softmax(classifier(x_in, getter=ema_getter, training=False)),
+                sup_gradient = sup_gradient)
+        else:
+            # No EMA
+            post_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            train_op = tf.train.AdamOptimizer(lr).minimize(loss_xe, colocate_gradients_with_ops=True)
+            with tf.control_dependencies([train_op]):
+                train_op = tf.group(*post_ops)
+
+            # Tuning op: only retrain batch norm.
+            skip_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+            classifier(x_in, training=True)
+            train_bn = tf.group(*[v for v in tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+                                  if v not in skip_ops])
+
+            return EasyDict(
+                x=x_in, label=l_in, train_op=train_op, tune_op=train_bn,
+                classify_raw=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA, for debugging.
+                classify_op=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA by rule.
+                sup_gradient = sup_gradient)
 
 
 def main(argv):
     del argv  # Unused.
     dataset = DATASETS[FLAGS.dataset]()
     log_width = utils.ilog2(dataset.width)
-    model = FSgradient(
+    model = MixupGrad(
         os.path.join(FLAGS.train_dir, dataset.name),
         dataset,
         lr=FLAGS.lr,
@@ -116,12 +136,12 @@ def main(argv):
         beta=FLAGS.beta,
         regularizer=FLAGS.regularizer,
         gamma=FLAGS.gamma,
-        LH=float(FLAGS.LH),
-
+        LH=FLAGS.LH,
         scales=FLAGS.scales or (log_width - 2),
         filters=FLAGS.filters,
         repeat=FLAGS.repeat)
     model.train(FLAGS.nepoch*FLAGS.epochsize, FLAGS.epochsize) #(total # of data, epoch size)
+    # Gradient ??
     #model.train(FLAGS.train_kimg << 10, FLAGS.report_kimg << 10)
 
 

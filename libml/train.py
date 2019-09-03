@@ -185,7 +185,7 @@ class Model_clf(Model):
                 save_summaries_steps=report_nimg - batch) as train_session:
             self.session = train_session._tf_sess()
             self.tmp.step = self.session.run(self.step)
-            # epoch?
+            
             while self.tmp.step < train_nimg:
                 loop = trange(self.tmp.step % report_nimg, report_nimg, batch,
                               leave=False, unit='img', unit_scale=batch,
@@ -212,7 +212,7 @@ class Model_clf(Model):
         self.eval_mode(ckpt)
         self.cache_eval()
         raw = self.eval_stats(classify_op=self.ops.classify_raw)
-        #ema = self.eval_stats(classify_op=self.ops.classify_op)
+        ema = self.eval_stats(classify_op=self.ops.classify_op)
         lipschitz = self.eval_lipschitz(sup_gradient=self.ops.sup_gradient)
         #self.tune(16384)
         #tuned_raw = self.eval_stats(classify_op=self.ops.classify_raw)
@@ -220,7 +220,7 @@ class Model_clf(Model):
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
         print('%16s %8s %8s %8s' % (('raw',) + tuple('%.2f' % x for x in raw)))
         #print('%16s %8s %8s %8s' % (('Lipschitz', '%.2f' % lipschitz, '', '')))
-        #print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
+        print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
         #print('%16s %8s %8s %8s' % (('tuned_raw',) + tuple('%.2f' % x for x in tuned_raw)))
         #print('%16s %8s %8s %8s' % (('tuned_ema',) + tuple('%.2f' % x for x in tuned_ema)))
 
