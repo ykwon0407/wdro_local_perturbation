@@ -10,6 +10,7 @@ ML_DATA/
 __pycache__/
 
 experiments/
+figures/
 
 ### JupyterNotebook ###
 no_*.ipynb

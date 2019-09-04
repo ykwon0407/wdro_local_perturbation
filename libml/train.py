@@ -123,6 +123,8 @@ class Model:
     def eval_mode(self, ckpt=None):
         self.session = tf.Session(config=utils.get_config())
         saver = tf.train.Saver()
+
+        '''
         if ckpt is None:
             ckpt = utils.find_latest_checkpoint(self.checkpoint_dir)
         else:
@@ -134,6 +136,9 @@ class Model:
                 print('The cpkt_eval does not exists... Searching the latest checkpoint')
                 ckpt = utils.find_latest_checkpoint(self.checkpoint_dir)
             print('The cpkt path is : ', ckpt)
+        '''
+        
+        print('The cpkt path is : ', ckpt)
         saver.restore(self.session, ckpt)
         self.tmp.step = self.session.run(self.step)
         print('Eval model %s at global_step %d imgs' % (self.__class__.__name__, self.tmp.step))
@@ -213,7 +218,7 @@ class Model_clf(Model):
         self.cache_eval()
         raw = self.eval_stats(classify_op=self.ops.classify_raw)
         ema = self.eval_stats(classify_op=self.ops.classify_op)
-        lipschitz = self.eval_lipschitz(sup_gradient=self.ops.sup_gradient)
+        lipschitz = self.eval_lipschitz(sup_gradient=self.ops.sup_gradient, ckpt=ckpt[-8:])
         #self.tune(16384)
         #tuned_raw = self.eval_stats(classify_op=self.ops.classify_raw)
         #tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
@@ -277,7 +282,7 @@ class Model_clf(Model):
             json.dump(self.accuracies, outfile)
         return np.array(accuracies, 'f')
 
-    def eval_lipschitz(self, batch=None, feed_extra=None, sup_gradient=None):
+    def eval_lipschitz(self, ckpt, batch=None, feed_extra=None, sup_gradient=None):
         """Evaluate lipchitz constant of h(x,y)=loss(f(x),y) on test images."""
         batch = batch or FLAGS.batch
         sup_gradient = self.ops.sup_gradient if sup_gradient is None else sup_gradient        
@@ -295,7 +300,7 @@ class Model_clf(Model):
         predicted = np.concatenate(predicted, axis=0)
 
         #Saving lipschitz.txt
-        with open(os.path.join(self.train_dir, 'gradients.txt'), 'w') as outfile:
+        with open(os.path.join(self.train_dir, 'gradients_{}.txt'.format(ckpt)), 'w') as outfile:
             json.dump({'gradients': predicted.tolist()}, outfile)
         return predicted
 
