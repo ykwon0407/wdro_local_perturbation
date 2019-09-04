@@ -1,9 +1,0 @@
-session_name: grad_regularization_l2
-windows:
-        - window_name: grad_regularization_l2
-          layout: even-horizontal
-          shell_command_before: cd ~/deep/project/dro-id/
-          panes:
-                  - sh runs/l2_wy_10.sh
-                  - sh runs/l2_wy_100.sh
-                  

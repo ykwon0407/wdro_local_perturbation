@@ -12,6 +12,8 @@ __pycache__/
 experiments/
 figures/
 
+no_*.sh
+
 ### JupyterNotebook ###
 no_*.ipynb
 *.ipynb_checkpoints
