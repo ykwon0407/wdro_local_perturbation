@@ -80,8 +80,6 @@ def main(argv):
 
     #generating model directory...
     model_dir = 'erm'
-    if FLAGS.ema != 0:
-        model_dir = model_dir + '_ema'
 
     model = FSBaseline(
         os.path.join(FLAGS.train_dir, model_dir, dataset.name),

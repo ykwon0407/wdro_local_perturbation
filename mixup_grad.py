@@ -135,9 +135,6 @@ def main(argv):
     else:
         assert False, 'Type of regularizer must be either: None, maxsup, maxl2, l2'
 
-    if FLAGS.ema != 0:
-        model_dir = model_dir + '_ema'
-
     model = MixupGrad(
         os.path.join(FLAGS.train_dir, model_dir, dataset.name),
         dataset,
