@@ -40,7 +40,7 @@ flags.DEFINE_integer('saveperepoch', 10, 'epochs per Save checkpoint')
 
 class Model:
     def __init__(self, train_dir: str, dataset: data.DataSet, **kwargs):
-        self.train_dir = os.path.join(train_dir, self.experiment_name(**kwargs))
+        self.train_dir = train_dir #, self.experiment_name(**kwargs))
         self.params = EasyDict(kwargs)
         self.dataset = dataset
         self.session = None
@@ -117,8 +117,8 @@ class Model:
         return instance
 
     def experiment_name(self, **kwargs):
-        args = [x + str(y) for x, y in sorted(kwargs.items())]
-        return '_'.join([self.__class__.__name__] + args)
+        args = [x + str(y) for x, y in sorted(kwargs.items())] 
+        return '_'.join([self.__class__.__name__] + args) #Class name + args ex) FSgradient_LH1.0
 
     def eval_mode(self, ckpt=None):
         self.session = tf.Session(config=utils.get_config())
@@ -220,8 +220,8 @@ class Model_clf(Model):
         ema = self.eval_stats(classify_op=self.ops.classify_op)
         lipschitz = self.eval_lipschitz(sup_gradient=self.ops.sup_gradient, ckpt=ckpt[-8:])
         #self.tune(16384)
-        #tuned_raw = self.eval_stats(classify_op=self.ops.classify_raw)
-        #tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
+        tuned_raw = self.eval_stats(classify_op=self.ops.classify_raw)
+        tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
         print('%16s %8s %8s %8s' % (('raw',) + tuple('%.2f' % x for x in raw)))
         #print('%16s %8s %8s %8s' % (('Lipschitz', '%.2f' % lipschitz, '', '')))
