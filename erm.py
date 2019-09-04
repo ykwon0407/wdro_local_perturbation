@@ -77,8 +77,14 @@ def main(argv):
     del argv  # Unused.
     dataset = DATASETS[FLAGS.dataset]()
     log_width = utils.ilog2(dataset.width)
+
+    #generating model directory...
+    model_dir = 'erm'
+    if FLAGS.ema != 0:
+        model_dir = model_dir + '_ema'
+
     model = FSBaseline(
-        os.path.join(FLAGS.train_dir, dataset.name),
+        os.path.join(FLAGS.train_dir, model_dir, dataset.name),
         dataset,
         lr=FLAGS.lr,
         wd=FLAGS.wd,

@@ -161,7 +161,6 @@ class DataSet:
                        nclass=nclass, colors=colors, height=height, width=width, mean=mean, std=std)
 
         return name + name_suffix + fullname + '-' + str(valid), create
-
 augment_stl10 = lambda x: dict(image=augment_shift(augment_mirror(x['image']), 12), label=x['label'])
 augment_cifar10 = lambda x: dict(image=augment_shift(augment_mirror(x['image']), 4), label=x['label'])
 augment_svhn = lambda x: dict(image=augment_shift(x['image'], 4), label=x['label'])

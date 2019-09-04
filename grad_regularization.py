@@ -104,8 +104,22 @@ def main(argv):
     del argv  # Unused.
     dataset = DATASETS[FLAGS.dataset]()
     log_width = utils.ilog2(dataset.width)
+
+    #generating model directory
+    if FLAGS.regularizer == 'l2':
+        model_dir = 'l2_' + str(FLAGS.gamma)
+    elif FLAGS.regularizer == 'maxsup':
+        model_dir = 'maxsup_' + str(FLAGS.LH)
+    elif FLAGS.regularizer == 'None':
+        model_dir = 'mixup'
+    else:
+        assert False, 'Type of regularizer must be either: None, maxsup, maxl2, l2'
+
+    if FLAGS.ema != 0:
+        model_dir = model_dir + '_ema'
+
     model = FSgradient(
-        os.path.join(FLAGS.train_dir, dataset.name),
+        os.path.join(FLAGS.train_dir, model_dir, dataset.name),
         dataset,
         lr=FLAGS.lr,
         wd=FLAGS.wd,
