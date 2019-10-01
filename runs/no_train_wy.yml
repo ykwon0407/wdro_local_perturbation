@@ -1,0 +1,7 @@
+session_name: l2 
+windows:
+  - window_name: gamma=0.0001 and gamma=0.0002
+    layout: even-horizontal
+    panes:
+      - sh runs/no_CUDA0_wy.sh
+      - sh runs/no_CUDA1_wy.sh
