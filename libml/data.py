@@ -46,7 +46,6 @@ def record_parse(serialized_example):
     label = features['label']
     return dict(image=image, label=label)
 
-
 def default_parse(dataset: tf.data.Dataset, parse_fn=record_parse) -> tf.data.Dataset:
     para = 4 * max(1, len(utils.get_available_gpus())) * FLAGS.para_parse
     return dataset.map(parse_fn, num_parallel_calls=para)
@@ -161,6 +160,7 @@ class DataSet:
                        nclass=nclass, colors=colors, height=height, width=width, mean=mean, std=std)
 
         return name + name_suffix + fullname + '-' + str(valid), create
+
 augment_stl10 = lambda x: dict(image=augment_shift(augment_mirror(x['image']), 12), label=x['label'])
 augment_cifar10 = lambda x: dict(image=augment_shift(augment_mirror(x['image']), 4), label=x['label'])
 augment_svhn = lambda x: dict(image=augment_shift(x['image'], 4), label=x['label'])
