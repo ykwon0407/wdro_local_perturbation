@@ -20,6 +20,7 @@ import os
 from absl import app
 from absl import flags
 from easydict import EasyDict
+from skimage.util import random_noise
 
 from libml import utils
 from libml.models import MultiModel
@@ -46,7 +47,6 @@ class MixupGrad(MultiModel):
         l_in = tf.placeholder(tf.int32, [None], 'labels')
         wd *= lr
         classifier = functools.partial(self.classifier, **kwargs)
-
         def get_logits(x):
             logits = classifier(x, training=True)
             return logits
@@ -122,7 +122,7 @@ class MixupGrad(MultiModel):
 
 def main(argv):
     del argv  # Unused.
-    dataset = DATASETS[FLAGS.dataset]()
+    dataset = DATASETS[FLAGS.dataset]() #create()
     log_width = utils.ilog2(dataset.width)
 
     #generating model directory
@@ -145,8 +145,8 @@ def main(argv):
         nclass=dataset.nclass,
         ema=FLAGS.ema,
         beta=FLAGS.beta,
-        regularizer=FLAGS.regularizer,
         gamma=FLAGS.gamma,
+        regularizer=FLAGS.regularizer,
         LH=FLAGS.LH,
         scales=FLAGS.scales or (log_width - 2),
         filters=FLAGS.filters,
@@ -168,7 +168,9 @@ if __name__ == '__main__':
     flags.DEFINE_integer('epochsize', 1 << 16, 'Size of 1 epoch')
     flags.DEFINE_float('LH', 1, 'Lipschitz upper bound')
     flags.DEFINE_float('gamma', 1, 'Regularization parameter')
+    flags.DEFINE_float('amount', 0, 'Probability of being salt or pepper')
     flags.DEFINE_string('regularizer', 'None', 'Type of regularizer: None, maxsup, maxl2, l2')
+    flags.DEFINE_string('mode', '', 'Type of regularizer: None, maxsup, maxl2, l2')
     FLAGS.set_default('dataset', 'cifar10-1')
     FLAGS.set_default('batch', 64)
     FLAGS.set_default('lr', 0.002)
