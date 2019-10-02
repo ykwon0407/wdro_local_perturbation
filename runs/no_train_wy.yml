@@ -1,7 +1,7 @@
 session_name: l2 
 windows:
-  - window_name: gamma=0.0001 and gamma=0.0002
+  - window_name: l2 and erm and mixup
     layout: even-horizontal
     panes:
-      - sh runs/no_CUDA0_wy.sh
-      - sh runs/no_CUDA1_wy.sh
+      - sh runs/no_noisy_eval_0.sh
+      - sh runs/no_noisy_eval_1.sh

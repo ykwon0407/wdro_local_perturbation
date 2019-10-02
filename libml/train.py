@@ -14,6 +14,7 @@
 """Training loop, checkpoint saving and loading, evaluation code."""
 
 import json
+import os
 import os.path
 import shutil
 import functools
@@ -24,6 +25,7 @@ from absl import flags
 from easydict import EasyDict
 from tqdm import trange
 from skimage.util import random_noise
+from PIL import Image
 
 from libml import data, utils
 
@@ -64,6 +66,13 @@ class Model:
                 self.accuracies = json.loads(infile.read())
         else:
             self.accuracies = {}
+
+        #Initialize noise.txt
+        if os.path.exists(self.train_dir + "/noise.txt"):
+            with open(self.train_dir + "/noise.txt", 'r') as infile:
+                self.noise = json.loads(infile.read())
+        else:
+            self.noise = {}
 
         #Print model Config.
         print()
@@ -246,12 +255,16 @@ class Model_clf(Model):
         self.cache_eval()
         print('Evaluating with noisy images')
         ema = self.eval_stats(classify_op=self.ops.classify_op)
-        ema_noise = self.eval_stats_noise(classify_op=self.ops.classify_op)
+        ema_noise, noise_settings = self.eval_stats_noise(classify_op=self.ops.classify_op)
         #self.tune(16384)
         tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
         print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
         print('%16s %8s %8s %8s' % (('ema_noise',) + tuple('%.2f' % x for x in ema_noise)))
+        #Saving noise.txt
+        self.noise.update({str(noise_settings):ema_noise.tolist() + ema.tolist()})
+        with open(os.path.join(self.train_dir, 'noise.txt'), 'w') as outfile:
+            json.dump(self.noise, outfile)
 
     def cache_eval(self):
         """Cache datasets for computing eval stats."""
@@ -313,15 +326,36 @@ class Model_clf(Model):
         accuracies = []
         for subset in ('train_labeled', 'valid', 'test'):
             images, labels = self.tmp.cache[subset]
-            #adding noise    
+            print('saving example images...')
+            image_directory = os.path.join(self.train_dir, 'example_images')
+            if os.path.exists(image_directory) is not True:
+                try:
+                    os.mkdir(image_directory)
+                except OSError:
+                    print("Creation of the directory %s failed" % image_directory)
+            example_image = (images[0]+1)*255/2
+            img = Image.fromarray(example_image.astype('uint8'))
+            img.save(self.train_dir + '/example_images/{}.png'.format(subset))
+            #adding noise
             if FLAGS.noise_mode in ['gaussian', 'speckle']:
                 noise_mean = 0 if FLAGS.noise_mean is None else FLAGS.noise_mean
                 print("{}-Mode:{}, Mean:{}, Var:{}, seed:{}".format(subset, FLAGS.noise_mode, noise_mean, FLAGS.noise_var, FLAGS.noise_seed))
                 images = random_noise(images, mode=FLAGS.noise_mode, mean=noise_mean, var=FLAGS.noise_var, seed=FLAGS.noise_seed)
                 #save noise settings
+                noise_settings = dict(Mode=FLAGS.noise_mode, Mean=noise_mean, Var=FLAGS.noise_var, seed=FLAGS.noise_seed)
+                print('saving example noisy images....')
+                example_image = (images[0]+1)*255/2
+                img = Image.fromarray(example_image.astype('uint8'))
+                img.save(self.train_dir + '/example_images/{}_{}_{}_{}.png'.format(FLAGS.noise_mode, noise_mean, FLAGS.noise_var, subset))
             else:
                 print("{}-Mode:{}, p:{}, seed:{}".format(subset, FLAGS.noise_mode, FLAGS.noise_p, FLAGS.noise_seed))
                 images = random_noise(images, mode=FLAGS.noise_mode, amount=FLAGS.noise_p, seed=FLAGS.noise_seed)
+                #save noise settings
+                noise_settings = dict(Mode=FLAGS.noise_mode, p=noise_p, seed=FLAGS.noise_seed)
+                print('saving example noisy images....')
+                example_image = (images[0]+1)*255/2
+                img = Image.fromarray(example_image.astype('uint8'))
+                img.save(self.train_dir + '/example_images/{}_{}_{}.png'.format(FLAGS.noise_mode, FLAGS.noise_p, subset))
             predicted = []
             for x in range(0, images.shape[0], batch):
                 p = self.session.run(
@@ -333,18 +367,7 @@ class Model_clf(Model):
                 predicted.append(p)
             predicted = np.concatenate(predicted, axis=0)
             accuracies.append((predicted.argmax(1) == labels).mean() * 100)
-        #print accuracies
-        self.train_print('%-5d k imgs  accuracy train/valid/test  %.2f  %.2f  %.2f' %
-                         tuple([self.tmp.step >> 10] + accuracies))
-        self.accuracies['epoch' + str(self.tmp.step // FLAGS.epochsize)] = accuracies
-        #Saving accurcies.txt
-        if FLAGS.eval_ckpt:
-            return np.array(accuracies, 'f')
-        '''
-        with open(os.path.join(self.train_dir, 'accuracies.txt'), 'w') as outfile:
-            json.dump(self.accuracies, outfile)
-        return np.array(accuracies, 'f')
-        '''
+        return np.array(accuracies, 'f'), noise_settings
 
     def eval_lipschitz(self, ckpt, batch=None, feed_extra=None, sup_gradient=None):
         """Evaluate lipchitz constant of h(x,y)=loss(f(x),y) on test images."""

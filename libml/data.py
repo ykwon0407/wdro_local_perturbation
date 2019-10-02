@@ -42,7 +42,7 @@ def record_parse(serialized_example):
         features={'image': tf.FixedLenFeature([], tf.string),
                   'label': tf.FixedLenFeature([], tf.int64)})
     image = tf.image.decode_image(features['image'])
-    image = tf.cast(image, tf.float32) * (2.0 / 255) - 1.0
+    image = tf.cast(image, tf.float32) * (2.0 / 255) - 1.0 #convert [0,255] into [-1,1]
     label = features['label']
     return dict(image=image, label=label)
 
