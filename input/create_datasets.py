@@ -28,13 +28,10 @@ sys.path.append('./')
 
 from easydict import EasyDict
 from libml.data import DATA_DIR
-from skimage.util import random_noise
 import numpy as np
 import scipy.io
 import tensorflow as tf
 from tqdm import trange
-
-FLAGS = flags.FLAGS
 
 URLS = {
     'svhn': 'http://ufldl.stanford.edu/housenumbers/{}_32x32.mat',
@@ -68,10 +65,10 @@ def _load_svhn():
         splits[split] = dataset
     return splits
 
-def _load_cifar10(mode=FLAGS.noise, amount=FLAGS.amount):
+def _load_cifar10():
     def unflatten(images):
         return np.transpose(images.reshape((images.shape[0], 3, 32, 32)),
-                            [0, 2, 3, 1]) #transpose to (batch, 32, 32, 3)
+                            [0, 2, 3, 1])
 
     with tempfile.NamedTemporaryFile() as f:
         request.urlretrieve(URLS['cifar10'], f.name)
@@ -92,35 +89,11 @@ def _load_cifar10(mode=FLAGS.noise, amount=FLAGS.amount):
     test_set['images'] = _encode_png(unflatten(test_set['images']))
     return dict(train=train_set, test=test_set)
 
-
-def _load_cifar10_ps():
-    def unflatten(images):
-        return np.transpose(images.reshape((images.shape[0], 3, 32, 32)),
-                            [0, 2, 3, 1]) #transpose to (batch, 32, 32, 3)
-
-    with tempfile.NamedTemporaryFile() as f:
-        request.urlretrieve(URLS['cifar10'], f.name)
-        tar = tarfile.open(fileobj=f)
-        train_data_batches, train_data_labels = [], []
-        for batch in range(1, 6):
-            data_dict = scipy.io.loadmat(tar.extractfile(
-                'cifar-10-batches-mat/data_batch_{}.mat'.format(batch)))
-            train_data_batches.append(data_dict['data'])
-            train_data_labels.append(data_dict['labels'].flatten())
-        train_set = {'images': np.concatenate(train_data_batches, axis=0),
-                     'labels': np.concatenate(train_data_labels, axis=0)}
-        data_dict = scipy.io.loadmat(tar.extractfile(
-            'cifar-10-batches-mat/test_batch.mat'))
-        test_set = {'images': data_dict['data'],
-                    'labels': data_dict['labels'].flatten()}
-    train_set['images'] = _encode_png(unflatten(train_set['images']))
-    test_set['images'] = _encode_png(unflatten(test_set['images']))
-    return dict(train=train_set, test=test_set)
 
 def _load_cifar100():
     def unflatten(images):
         return np.transpose(images.reshape((images.shape[0], 3, 32, 32)),
-                            [0, 2, 3, 1]) #transpose to (batch, 32, 32, 3)
+                            [0, 2, 3, 1])
 
     with tempfile.NamedTemporaryFile() as f:
         request.urlretrieve(URLS['cifar100'], f.name)
@@ -190,29 +163,30 @@ CONFIGS = dict(
 
 
 if __name__ == '__main__':
-    #Flag arguments
-    flags.DEFINE_string('dataset', 'cifar10', 'Name of datasets to install (cifar10, cifar100)')
-    flags.DEFINE_string('noise', 'None', 'mode for noise (salt, pepper, s&p)')
-    flags.DEFINE_integer('seed', None, 'seed for noise generating')
-    flags.DEFINE_float('amount', 0, 'Proportion of image pixels to replace with noise on range [0,1]')
-    
-    print('Datasets: {}'.format(dataset))
-    
-    #make DATA_DIR
+    if len(sys.argv[1:]):
+        subset = set(sys.argv[1:])
+    else:
+        subset = set(CONFIGS.keys())
+
+    print('Datasets: {}'.format(subset))
+
     try:
         os.makedirs(DATA_DIR)
     except OSError:
         pass
-
-    #check whether the dataset is already installed
-    name = FLAGS.dataset + '_' + FLAGS.noise + '_' + str(FLAGS.amount)
-    config = CONFIGS[FLAGS.dataset]
-    if _is_installed(name, config['checksums']): #find DATA_DIR/name-train.tfrecord, DATA_DIR/name-test.tfrecord
-        print('Skipping already installed:', name)
-    else:
+    for name, config in CONFIGS.items():
+        if name not in subset:
+            continue
+        if 'is_installed' in config:
+            if config['is_installed']():
+                print('Skipping already installed:', name)
+                continue
+        elif _is_installed(name, config['checksums']):
+            print('Skipping already installed:', name)
+            continue
         print('Preparing', name)
-        datas = config['loader'](mode=FLAGS.noise, amount=FLAGS.amount)
-        saver = config.get('saver', _save_as_tfrecord) #no 'saver' in dict config, default=_save_as_tfrecord
+        datas = config['loader']()
+        saver = config.get('saver', _save_as_tfrecord)
         for sub_name, data in datas.items():
             if sub_name == 'readme':
                 filename = os.path.join(DATA_DIR, '%s-%s.txt' % (name, sub_name))
