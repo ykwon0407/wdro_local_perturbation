@@ -351,7 +351,7 @@ class Model_clf(Model):
                 print("{}-Mode:{}, p:{}, seed:{}".format(subset, FLAGS.noise_mode, FLAGS.noise_p, FLAGS.noise_seed))
                 images = random_noise(images, mode=FLAGS.noise_mode, amount=FLAGS.noise_p, seed=FLAGS.noise_seed)
                 #save noise settings
-                noise_settings = dict(Mode=FLAGS.noise_mode, p=noise_p, seed=FLAGS.noise_seed)
+                noise_settings = dict(Mode=FLAGS.noise_mode, p=FLAGS.noise_p, seed=FLAGS.noise_seed)
                 print('saving example noisy images....')
                 example_image = (images[0]+1)*255/2
                 img = Image.fromarray(example_image.astype('uint8'))
