@@ -73,7 +73,7 @@ def main(argv):
     print('%d records found' % count)
     nclass = len(class_id) # number of classes
     train_stats = np.array([len(class_id[i]) for i in range(nclass)], np.float64)
-    train_stats /= train_stats.max()
+    train_stats /= train_stats.max() #prior distribution of labels
 
     if 'stl10' in argv[1]:
         # All of the unlabeled data is given label 0, but we know that

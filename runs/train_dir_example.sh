@@ -10,7 +10,7 @@ cd ~/deep/project/dro-id/
 ####example: ./experiments/l2_0.0001/cifar100.1@50000-1/tf, args  
 
 #number of epochs
-$common_args = --nepoch 100 
+$common_args ='--nepoch 100' 
 
 #erm
 CUDA_VISIBLE_DEVICES=0 python3 erm.py --dataset=cifar10.1@50000-1 --wd=0.02 --smoothing 0.001 $common_args
