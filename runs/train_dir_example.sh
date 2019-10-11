@@ -2,7 +2,6 @@
 
 cd ~/deep/project/dro-id/
 
-
 #train_dir: directory to save the model folder (such as erm_ema, l2_0.0001, maxsup_2, mixup ...)
 #default train dir is ./experiments/
 

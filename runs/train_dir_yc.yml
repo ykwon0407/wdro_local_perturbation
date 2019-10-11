@@ -1,0 +1,9 @@
+session_name: train_dir_yc_cifar002
+windows:
+        - window_name: experiments_test
+          layout: even-vertical
+          shell_command_before: cd ~/deep/project/dro-id
+          panes:
+                  - sh runs/train_dir_yc.sh
+                  - sh runs/train_dir_yc_2.sh
+                  
