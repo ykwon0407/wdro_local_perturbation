@@ -1,6 +1,6 @@
 session_name: l2 
 windows:
-  - window_name: l2 and erm and mixup
+  - window_name: l2_0.001
     layout: even-horizontal
     panes:
       - sh runs/no_noisy_eval_0.sh
