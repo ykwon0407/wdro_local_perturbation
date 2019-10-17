@@ -68,14 +68,14 @@ class MixupGrad(MultiModel):
             loss_grad = tf.constant(0.0)
         else:
             assert False, 'unavailable regularizer, (maxsup, maxl2, l2, None)'
-            
+
         tf.summary.scalar('losses/main', loss_main)
         tf.summary.scalar('losses/gradient', loss_grad)
         tf.summary.scalar('gradient/max_gradient', tf.reduce_max(tf.abs(gradient)))
         loss_xe = loss_main + loss_grad
 
-        #For lipschitz
-        sup_gradient = tf.reduce_max(tf.abs(gradient), axis=[1,2,3]) #(batchsize, )
+        #sup_norm of gradients
+        sup_gradients = tf.reduce_max(tf.abs(gradient), axis=[1,2,3]) #(batchsize, )
 
         #EMA part
         if ema > 0 :
@@ -99,7 +99,7 @@ class MixupGrad(MultiModel):
                 x=x_in, label=l_in, train_op=train_op, tune_op=train_bn,
                 classify_raw=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA, for debugging.
                 classify_op=tf.nn.softmax(classifier(x_in, getter=ema_getter, training=False)),
-                sup_gradient = sup_gradient)
+                sup_gradients = sup_gradients)
         else:
             # No EMA
             post_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
@@ -117,7 +117,7 @@ class MixupGrad(MultiModel):
                 x=x_in, label=l_in, train_op=train_op, tune_op=train_bn,
                 classify_raw=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA, for debugging.
                 classify_op=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA by rule.
-                sup_gradient = sup_gradient)
+                sup_gradients = sup_gradients)
 
 
 def main(argv):

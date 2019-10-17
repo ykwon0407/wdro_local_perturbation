@@ -24,10 +24,10 @@ import tensorflow as tf
 from absl import flags
 from easydict import EasyDict
 from tqdm import trange
-from skimage.util import random_noise
 from PIL import Image
 
 from libml import data, utils
+from libml.noise import random_noise
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('train_dir', './experiments',
@@ -42,7 +42,7 @@ flags.DEFINE_string('eval_ckpt', '', 'Checkpoint to evaluate. If provided, do no
 flags.DEFINE_integer('saveperepoch', 10, 'epochs per Save checkpoint')
 
 #noise arguments
-flags.DEFINE_string('noise_mode', '', 'mode for noisy image(gaussian, localvar, poisson, salt, pepper, s&p, speckle)')
+flags.DEFINE_string('noise_mode', '', 'mode for noisy image(Gaussian, localvar, poisson, salt, pepper, s&p, speckle)')
 flags.DEFINE_float('noise_mean', None, 'Mean of random distribution. Used in gaussian and speckle')
 flags.DEFINE_float('noise_var', None, 'Variance of random distribution. Used in gaussian and speckle')
 flags.DEFINE_float('noise_p', None, 'Proportion of image pixels to replace with noise on range [0, 1]. Used in salt, pepper, and salt & pepper. Default : 0.05')
@@ -68,8 +68,8 @@ class Model:
             self.accuracies = {}
 
         #Initialize noise.txt
-        if os.path.exists(self.train_dir + "/noise.txt"):
-            with open(self.train_dir + "/noise.txt", 'r') as infile:
+        if os.path.exists(FLAGS.eval_ckpt[:-23] + "/noise.txt"):
+            with open(FLAGS.eval_ckpt[:-23] + "/noise.txt", 'r') as infile:
                 self.noise = json.loads(infile.read())
         else:
             self.noise = {}
@@ -92,7 +92,7 @@ class Model:
         print()
         print(fmt % to_print[-1])
         print('-' * 80)
-        if not FLAGS.eval_ckpt: 
+        if not FLAGS.eval_ckpt:
             self._create_initial_files()
         else:
             print('-'*50)
@@ -134,7 +134,7 @@ class Model:
         return instance
 
     def experiment_name(self, **kwargs):
-        args = [x + str(y) for x, y in sorted(kwargs.items())] 
+        args = [x + str(y) for x, y in sorted(kwargs.items())]
         return '_'.join([self.__class__.__name__] + args) #Class name + args ex) FSgradient_LH1.0
 
     def eval_mode(self, ckpt=None):
@@ -154,7 +154,7 @@ class Model:
                 ckpt = utils.find_latest_checkpoint(self.checkpoint_dir)
             print('The cpkt path is : ', ckpt)
         '''
-        
+
         print('The cpkt path is : ', ckpt)
         saver.restore(self.session, ckpt)
         self.tmp.step = self.session.run(self.step)
@@ -186,7 +186,7 @@ class Model_clf(Model):
     def train(self, train_nimg, report_nimg, **kwargs):
         if FLAGS.eval_ckpt:
             if FLAGS.noise_mode:
-                print("Evaluating noisy image...")
+                print("Evaluating accuracy with noisy train, valid, test images...")
                 self.eval_noise(FLAGS.eval_ckpt, **kwargs)
             else:
                 self.eval_checkpoint(FLAGS.eval_ckpt)
@@ -211,7 +211,7 @@ class Model_clf(Model):
                 save_summaries_steps=report_nimg - batch) as train_session:
             self.session = train_session._tf_sess()
             self.tmp.step = self.session.run(self.step)
-            
+
             while self.tmp.step < train_nimg:
                 loop = trange(self.tmp.step % report_nimg, report_nimg, batch,
                               leave=False, unit='img', unit_scale=batch,
@@ -228,7 +228,7 @@ class Model_clf(Model):
         # with self.graph.as_default():
         train_labeled = self.dataset.train_labeled.batch(batch).prefetch(16)
         train_labeled = train_labeled.make_one_shot_iterator().get_next()
-        # epoch? 
+        # epoch?
         for _ in trange(0, train_nimg, batch, leave=False, unit='img', unit_scale=batch, desc='Tuning'):
             x = self.session.run([train_labeled])
             self.session.run([self.ops.tune_op], feed_dict={self.ops.x: x['image'],
@@ -237,14 +237,14 @@ class Model_clf(Model):
     def eval_checkpoint(self, ckpt=None):
         self.eval_mode(ckpt)
         self.cache_eval()
-        raw = self.eval_stats(classify_op=self.ops.classify_raw)
+        #raw = self.eval_stats(classify_op=self.ops.classify_raw)
         ema = self.eval_stats(classify_op=self.ops.classify_op)
-        lipschitz = self.eval_lipschitz(sup_gradient=self.ops.sup_gradient, ckpt=ckpt[-8:])
+        gradients = self.eval_sup_gradients(sup_gradients=self.ops.sup_gradients, ckpt=ckpt)
         #self.tune(16384)
         #tuned_raw = self.eval_stats(classify_op=self.ops.classify_raw)
         tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
-        print('%16s %8s %8s %8s' % (('raw',) + tuple('%.2f' % x for x in raw)))
+        #print('%16s %8s %8s %8s' % (('raw',) + tuple('%.2f' % x for x in raw)))
         #print('%16s %8s %8s %8s' % (('Lipschitz', '%.2f' % lipschitz, '', '')))
         print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
         #print('%16s %8s %8s %8s' % (('tuned_raw',) + tuple('%.2f' % x for x in tuned_raw)))
@@ -263,7 +263,7 @@ class Model_clf(Model):
         print('%16s %8s %8s %8s' % (('ema_noise',) + tuple('%.2f' % x for x in ema_noise)))
         #Saving noise.txt
         self.noise.update({str(noise_settings):ema_noise.tolist() + ema.tolist()})
-        with open(os.path.join(self.train_dir, 'noise.txt'), 'w') as outfile:
+        with open(os.path.join(ckpt[:-23], 'noise.txt'), 'w') as outfile:
             json.dump(self.noise, outfile)
 
     def cache_eval(self):
@@ -304,7 +304,7 @@ class Model_clf(Model):
                     feed_dict={
                         self.ops.x: images[x:x + batch],
                         **(feed_extra or {})
-                    })   
+                    })
                 predicted.append(p)
             predicted = np.concatenate(predicted, axis=0)
             accuracies.append((predicted.argmax(1) == labels).mean() * 100)
@@ -326,7 +326,7 @@ class Model_clf(Model):
         accuracies = []
         for subset in ('train_labeled', 'valid', 'test'):
             images, labels = self.tmp.cache[subset]
-            print('saving example images...')
+            print('saving an example of original {} image...'.format(subset))
             image_directory = os.path.join(self.train_dir, 'example_images')
             if os.path.exists(image_directory) is not True:
                 try:
@@ -337,13 +337,13 @@ class Model_clf(Model):
             img = Image.fromarray(example_image.astype('uint8'))
             img.save(self.train_dir + '/example_images/{}.png'.format(subset))
             #adding noise
-            if FLAGS.noise_mode in ['gaussian', 'speckle']:
+            if FLAGS.noise_mode in ['Gaussian', 'speckle']:
                 noise_mean = 0 if FLAGS.noise_mean is None else FLAGS.noise_mean
                 print("{}-Mode:{}, Mean:{}, Var:{}, seed:{}".format(subset, FLAGS.noise_mode, noise_mean, FLAGS.noise_var, FLAGS.noise_seed))
                 images = random_noise(images, mode=FLAGS.noise_mode, mean=noise_mean, var=FLAGS.noise_var, seed=FLAGS.noise_seed)
                 #save noise settings
                 noise_settings = dict(Mode=FLAGS.noise_mode, Mean=noise_mean, Var=FLAGS.noise_var, seed=FLAGS.noise_seed)
-                print('saving example noisy images....')
+                print('saving an example of noisy {} image...'.format(subset))
                 example_image = (images[0]+1)*255/2
                 img = Image.fromarray(example_image.astype('uint8'))
                 img.save(self.train_dir + '/example_images/{}_{}_{}_{}.png'.format(FLAGS.noise_mode, noise_mean, FLAGS.noise_var, subset))
@@ -352,7 +352,7 @@ class Model_clf(Model):
                 images = random_noise(images, mode=FLAGS.noise_mode, amount=FLAGS.noise_p, seed=FLAGS.noise_seed)
                 #save noise settings
                 noise_settings = dict(Mode=FLAGS.noise_mode, p=FLAGS.noise_p, seed=FLAGS.noise_seed)
-                print('saving example noisy images....')
+                print('saving an example of noisy {} image...'.format(subset))
                 example_image = (images[0]+1)*255/2
                 img = Image.fromarray(example_image.astype('uint8'))
                 img.save(self.train_dir + '/example_images/{}_{}_{}.png'.format(FLAGS.noise_mode, FLAGS.noise_p, subset))
@@ -363,16 +363,16 @@ class Model_clf(Model):
                     feed_dict={
                         self.ops.x: images[x:x + batch],
                         **(feed_extra or {})
-                    })   
+                    })
                 predicted.append(p)
             predicted = np.concatenate(predicted, axis=0)
             accuracies.append((predicted.argmax(1) == labels).mean() * 100)
         return np.array(accuracies, 'f'), noise_settings
 
-    def eval_lipschitz(self, ckpt, batch=None, feed_extra=None, sup_gradient=None):
-        """Evaluate lipchitz constant of h(x,y)=loss(f(x),y) on test images."""
+    def eval_sup_gradients(self, ckpt, batch=None, feed_extra=None, sup_gradients=None):
+        """Evaluate sup norm of gradients of h(x,y)=loss(f(x),y) on test images."""
         batch = batch or FLAGS.batch
-        sup_gradient = self.ops.sup_gradient if sup_gradient is None else sup_gradient        
+        sup_gradient = self.ops.sup_gradients if sup_gradients is None else sup_gradients
         predicted = []
         x_test, y_test = self.tmp.cache['test']
         for i in range(0, x_test.shape[0], batch):
@@ -385,11 +385,13 @@ class Model_clf(Model):
                 })
             predicted.append(l)
         predicted = np.concatenate(predicted, axis=0)
-
-        #Saving lipschitz.txt
-        if os.path.exists(os.path.join(self.train_dir, 'gradients_{}.txt'.format(ckpt))) is False:
-            with open(os.path.join(self.train_dir, 'gradients_{}.txt'.format(ckpt)), 'w') as outfile:
+        #print('predicted.shape:',predicted.shape) (10000,)
+        #print('ckpt[:-23]:',ckpt[:-23])
+        #Saving gradients.txt
+        if os.path.exists(os.path.join(ckpt[:-23], 'gradients_{}.txt'.format(ckpt[-8:]))) is False:
+            with open(os.path.join(ckpt[:-23], 'gradients_{}.txt'.format(ckpt[-8:])), 'w') as outfile:
                 json.dump({'gradients': predicted.tolist()}, outfile)
+            print('gradients_{}.txt is saved at {}'.format(ckpt[-8:], ckpt[:-23]))
         return predicted
 
 

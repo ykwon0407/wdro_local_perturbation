@@ -49,6 +49,11 @@ class FSBaseline(MultiModel):
         loss = tf.reduce_mean(loss)
         tf.summary.scalar('losses/xe', loss)
 
+        #Define gradients
+        gradients = tf.gradients(loss, x)[0]
+        #sup_norm of gradients
+        sup_gradients = tf.reduce_max(tf.abs(gradients), axis=[1,2,3]) #(batchsize, )
+
         # Define hyperparameters
         ema = tf.train.ExponentialMovingAverage(decay=ema)
         ema_op = ema.apply(utils.model_vars())
@@ -70,7 +75,8 @@ class FSBaseline(MultiModel):
         return EasyDict(
             x=x_in, label=l_in, train_op=train_op, tune_op=train_bn,
             classify_raw=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA, for debugging.
-            classify_op=tf.nn.softmax(classifier(x_in, getter=ema_getter, training=False)))
+            classify_op=tf.nn.softmax(classifier(x_in, getter=ema_getter, training=False)),
+            sup_gradients=sup_gradients)
 
 
 def main(argv):
@@ -95,7 +101,7 @@ def main(argv):
         filters=FLAGS.filters,
         repeat=FLAGS.repeat)
     model.train(FLAGS.nepoch*FLAGS.epochsize, FLAGS.epochsize) #(total # of data, epoch size)
-    #model.train(FLAGS.report_nimg << 10, FLAGS.report_kimg << 10) 
+    #model.train(FLAGS.report_nimg << 10, FLAGS.report_kimg << 10)
 
 if __name__ == '__main__':
     utils.setup_tf()
