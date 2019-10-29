@@ -11,6 +11,7 @@ __pycache__/
 
 experiments/
 figures/
+results/
 
 no_*.sh
 
@@ -35,5 +36,3 @@ __pycache__/
 *.pyc
 
 TODO_LIST
-
-

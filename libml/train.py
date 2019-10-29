@@ -262,6 +262,7 @@ class Model_clf(Model):
         print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
         print('%16s %8s %8s %8s' % (('ema_noise',) + tuple('%.2f' % x for x in ema_noise)))
         #Saving noise.txt
+        noise_settings.update({'steps':ckpt[-8:]})
         self.noise.update({str(noise_settings):ema_noise.tolist() + ema.tolist()})
         with open(os.path.join(ckpt[:-23], 'noise.txt'), 'w') as outfile:
             json.dump(self.noise, outfile)
