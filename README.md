@@ -1,37 +1,15 @@
 
-## Distributionally Robust Optimization with Interpolated Data
-
-```bash
-.
-├── erm.py
-├── experiments
-├── input
-│   ├── create_datasets.py
-│   └── create_split.py
-├── libml
-│   ├── data.py
-│   ├── extract_accuracies_wy.py
-│   ├── extract_accuracies_yc.py
-│   ├── __init__.py
-│   ├── layers.py
-│   ├── models.py
-│   ├── spectral_norm.py
-│   ├── train.py
-│   └── utils.py
-├── mixup_grad.py
-├── notebook
-├── README.md
-├── requirements.txt
-└── runs
-```
+# Distributionally Robust Optimization with Interpolated Data
+------
+In this repository, we provide all python codes used in the paper 'Distributionally Robust Optimization with Interpolated Data'.
 
 # Prepare datasets
 ```
 sh runs/prepare_datasets.sh
 ```
-This code creates tfrecord files for each seed and size formed as `${dataset}.${seed}@${train_size}-{valid_size}`. For example, `cifar10.1@5000-1.tfrecord`
+This code creates `tfrecord` files for each `seed` and `train_size` formed as `${dataset}.${seed}@${train_size}-{valid_size}`. For example, `cifar10.1@5000-1.tfrecord`
 
-# Train
+# Train models
 Example 1. Train ERM model with cifar10.1@50000-1 dataset, weight decay = 0.02, and smoothing = 0.001
 ```
 CUDA_VISIBLE_DEVICES=0 python3 erm.py --dataset=cifar10.1@50000-1 --wd=0.02 --smoothing 0.001
@@ -91,3 +69,30 @@ Example 3. Evaluation with the l2 (gamma=0.1234) model saved at checkpoint: `exp
 CUDA_VISIBLE_DEVICES=0 python3 mixup_grad.py  --eval_ckpt experiments/l2_0.1234/cifar10.5@50000-1/tf/model.ckpt-04587520 --dataset=cifar10.5@50000-1
 ```
 This code evaluates sup norm of each gradient vectors and save at `./experiments/l2_0.1234/cifar10.5@50000-1/gradients-04587520.txt`
+
+
+## Directory tree
+
+```bash
+.
+├── erm.py
+├── experiments
+├── input
+│   ├── create_datasets.py
+│   └── create_split.py
+├── libml
+│   ├── data.py
+│   ├── extract_accuracies_wy.py
+│   ├── extract_accuracies_yc.py
+│   ├── __init__.py
+│   ├── layers.py
+│   ├── models.py
+│   ├── spectral_norm.py
+│   ├── train.py
+│   └── utils.py
+├── mixup_grad.py
+├── notebook
+├── README.md
+├── requirements.txt
+└── runs
+```
