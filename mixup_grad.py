@@ -20,7 +20,6 @@ import os
 from absl import app
 from absl import flags
 from easydict import EasyDict
-from skimage.util import random_noise
 
 from libml import utils
 from libml.models import MultiModel
