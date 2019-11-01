@@ -3,18 +3,18 @@
 In this repository, we provide all python codes used in the paper 'Distributionally Robust Optimization with Interpolated Data'.
 
 ## Prepare datasets
-The following simple code produces all the `tfrecord` files used in this repository.
+The following simple code produces the `tfrecord` files used in this repository.
 ```
 sh runs/prepare_datasets.sh
 ```
-The produced `tfrecord` files are named as `${dataset}.${seed}@${train_size}-{valid_size}` for each `seed` and `train_size`. For example, `cifar10.1@5000-1.tfrecord`
+The produced `tfrecord` files are named as `${dataset}.${seed}@${train_size}-{valid_size}` for each `seed` and `train_size`. For example, `cifar10.1@5000-1.tfrecord`.
 
 ## Train models
 Train (ERM/mixup/l2) model with `cifar10.1@50000-1.tfrecord` dataset. The following codes evaluate test accuracy at every epoch and save at `/path-to-model/accuracies.txt`. 
 ```
 python3 erm.py --dataset=cifar10.1@50000-1 --wd=0.02 --smoothing 0.001
 python3 mixup_grad.py --dataset=cifar100.5@5000-1 --nepoch 100
-python3 mixup_grad.py --dataset=cifar100.5@5000-1 --regularizer l2 --gamma 0.1234
+python3 mixup_grad.py --dataset=cifar100.5@5000-1 --regularizer l2 --gamma 0.008
 ```
 
 <!---This code creates `./experiments/erm/cifar10.1@50000-1/tf, args` directory and save model checkpoints and arguments. In addition, this code also saves train, validation and test accuracy on each epochs at `./experiments/erm/cifar10.1@50000-1/accuracies.txt`--->
@@ -26,9 +26,9 @@ python3 mixup_grad.py --dataset=cifar100.5@5000-1 --regularizer l2 --gamma 0.123
 
 Evaluation of the trained (ERM/mixup/l2) model with noisy samples. 
 ```
-python3 erm.py --eval_ckpt experiments/erm/cifar100.1@1000-1/tf/model.ckpt-06553600 -dataset=cifar100.1@1000-1 --noise_mode 'gaussian' --noise_var 0.01
+python3 erm.py --eval_ckpt experiments/erm/cifar100.1@1000-1/tf/model.ckpt-06553600 -dataset=cifar100.1@1000-1 --noise_mode 'Gaussian' --noise_var 0.01
 python3 mixup_grad.py --eval_ckpt experiments/mixup/cifar10.4@1000-1/tf/model.ckpt-06553600 --dataset=cifar10.4@1000-1 --noise_mode 's&p' --noise_p 0.01
-python3 mixup_grad.py --eval_ckpt experiments/l2_0.1234/cifar100.1@1000-1/tf/model.ckpt-06553600 --dataset=cifar100.1@1000-1 --noise_mode 'Gaussian' --noise_var 0.005
+python3 mixup_grad.py --eval_ckpt experiments/l2_0.008/cifar100.1@1000-1/tf/model.ckpt-06553600 --dataset=cifar100.1@1000-1 --regularizer l2 --gamma 0.008 --noise_mode 'Gaussian' --noise_var 0.01
 ```
 <!---This code evaluates accuracy using train, valid and test images affected by Gaussian noise with sigma=0.01, and save at `./experiments/erm/cifar100.1@1000-1/noise.txt`--->
 
