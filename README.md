@@ -2,6 +2,8 @@
 # Distributionally Robust Optimization with Interpolated Data
 In this repository, we provide all python codes used in the paper 'Distributionally Robust Optimization with Interpolated Data'.
 
+## NEED TO CHANGE IT WITH SHELL FILES.
+
 ## Prepare datasets
 The following simple code produces the `tfrecord` files used in this repository.
 ```
@@ -81,3 +83,12 @@ This code evaluates sup norm of each gradient vectors and save at `./experiments
 ├── requirements.txt
 └── runs
 ```
+
+
+
+## Author
+
+Yongchan Kwon, Ph.D. student, Department of Statistics, Seoul National University
+
+Wonyoung Kim, Ph.D. student, Department of Statistics, Seoul National University
+
