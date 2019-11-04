@@ -203,3 +203,6 @@ def para_cat(fn, *args):
     if isinstance(outputs[0], (tuple, list)):
         return [tf.concat(x, axis=0) for x in zip(*outputs)]
     return tf.concat(outputs, axis=0)
+
+
+

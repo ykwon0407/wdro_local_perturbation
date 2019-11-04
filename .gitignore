@@ -20,7 +20,8 @@ no_*.ipynb
 *.ipynb_checkpoints
 */.ipynb_checkpoints/*
 !make_figures.ipynb
-!make_figures_yc.ipynb
+cifar10*.ipynb
+make_figures_*.ipynb
 
 ### macOS ###
 # General
@@ -35,4 +36,8 @@ __pycache__/
 *$py.class
 *.pyc
 
-TODO_LIST
+
+# Working python files
+TODO_LIST 
+change.py
+

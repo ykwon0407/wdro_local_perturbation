@@ -348,7 +348,7 @@ class Model_clf(Model):
                 example_image = (images[0]+1)*255/2
                 img = Image.fromarray(example_image.astype('uint8'))
                 img.save(self.train_dir + '/example_images/{}_{}_{}_{}.png'.format(FLAGS.noise_mode, noise_mean, FLAGS.noise_var, subset))
-            else:
+            elif FLAGS.noise_mode in ['s&p']:
                 print("{}-Mode:{}, p:{}, seed:{}".format(subset, FLAGS.noise_mode, FLAGS.noise_p, FLAGS.noise_seed))
                 images = random_noise(images, mode=FLAGS.noise_mode, amount=FLAGS.noise_p, seed=FLAGS.noise_seed)
                 #save noise settings
@@ -357,6 +357,9 @@ class Model_clf(Model):
                 example_image = (images[0]+1)*255/2
                 img = Image.fromarray(example_image.astype('uint8'))
                 img.save(self.train_dir + '/example_images/{}_{}_{}.png'.format(FLAGS.noise_mode, FLAGS.noise_p, subset))
+            else:
+                assert False, "Please check noise_mode."
+
             predicted = []
             for x in range(0, images.shape[0], batch):
                 p = self.session.run(

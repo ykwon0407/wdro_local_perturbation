@@ -15,7 +15,7 @@ for seed in 1 2 3 4 5; do
     for size in 100 500 1000 2500 5000 25000 50000; do
         # CUDA_VISIBLE_DEVICES=0 python3 erm.py --dataset=cifar10.${seed}@${size}-1 --wd=0.02 --smoothing 0.001 $common_args &
         # CUDA_VISIBLE_DEVICES=1 python3 mixup_grad.py --dataset=cifar10.${seed}@${size}-1 $common_args 
-        CUDA_VISIBLE_DEVICES=0 python3 mixup_grad.py --dataset=cifar10.${seed}@${size}-1 --regularizer l2 --gamma 0.002 $common_args
+        CUDA_VISIBLE_DEVICES=0 python3 mixup_grad.py --dataset=cifar10.${seed}@${size}-1 --regularizer l2 --gamma 0.008 $common_args
         # CUDA_VISIBLE_DEVICES=0 python3 mixup_grad.py --dataset=cifar10.${seed}@${size}-1 --regularizer l2 --gamma 0.0005 $common_args 
     done
 done

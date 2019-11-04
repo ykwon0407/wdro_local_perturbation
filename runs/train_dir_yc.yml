@@ -1,4 +1,4 @@
-session_name: train_dir_yc_cifar002
+session_name: train_dir_yc_cifar008
 windows:
         - window_name: experiments_test
           layout: even-vertical
