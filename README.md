@@ -2,7 +2,7 @@
 # Distributionally Robust Optimization with Interpolated Data
 In this repository, we provide all python codes used in the paper 'Distributionally Robust Optimization with Interpolated Data'.
 
-## NEED TO CHANGE IT WITH SHELL FILES.
+## NEED TO CHANGE IT WITH SHELL FILES. - (YC. Nov 5.)
 
 ## Prepare datasets
 The following simple code produces the `tfrecord` files used in this repository.
