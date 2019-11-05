@@ -46,11 +46,12 @@ class FSBaseline(MultiModel):
 
         # Define loss
         loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=l, logits=logits)
-        loss = tf.reduce_mean(loss)
-        tf.summary.scalar('losses/xe', loss)
-
         #Define gradients
         gradients = tf.gradients(loss, x)[0]
+
+        loss = tf.reduce_mean(loss)
+        tf.summary.scalar('losses/xe', loss)
+        
         #sup_norm of gradients
         sup_gradients = tf.reduce_max(tf.abs(gradients), axis=[1,2,3]) #(batchsize, )
 
