@@ -18,6 +18,7 @@ import os
 import os.path
 import shutil
 import functools
+import ot
 
 import numpy as np
 import tensorflow as tf
@@ -255,15 +256,18 @@ class Model_clf(Model):
         self.cache_eval()
         print('Evaluating with noisy images')
         ema = self.eval_stats(classify_op=self.ops.classify_op)
-        ema_noise, noise_settings = self.eval_stats_noise(classify_op=self.ops.classify_op)
+        ema_noise, noise_settings, Wasserstein_1, Wasserstein_2, Wasserstein_infty = self.eval_stats_noise(classify_op=self.ops.classify_op)
         #self.tune(16384)
         tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
         print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
         print('%16s %8s %8s %8s' % (('ema_noise',) + tuple('%.2f' % x for x in ema_noise)))
+        print('%16s %8s %8s %8s' % (('W_1 dist',) + tuple('%.2f' % x for x in Wasserstein_1)))
+        print('%16s %8s %8s %8s' % (('W_2 dist',) + tuple('%.2f' % x for x in Wasserstein_2)))
+        print('%16s %8s %8s %8s' % (('W_infty dist',) + tuple('%.2f' % x for x in Wasserstein_infty)))
         #Saving noise.txt
         noise_settings.update({'steps':ckpt[-8:]})
-        self.noise.update({str(noise_settings):ema_noise.tolist() + ema.tolist()})
+        self.noise.update({str(noise_settings):ema_noise.tolist() + ema.tolist() + Wasserstein_2.tolist()})
         with open(os.path.join(ckpt[:-23], 'noise.txt'), 'w') as outfile:
             json.dump(self.noise, outfile)
 
@@ -324,9 +328,11 @@ class Model_clf(Model):
         """Evaluate model on noisy train, valid and test."""
         batch = batch or FLAGS.batch
         classify_op = self.ops.classify_op if classify_op is None else classify_op
-        accuracies = []
+        accuracies =  []
+        Wasserstein_1, Wasserstein_2, Wasserstein_infty = [], [], []
         for subset in ('train_labeled', 'valid', 'test'):
             images, labels = self.tmp.cache[subset]
+            #print('images.shape', images.shape)
             print('saving an example of original {} image...'.format(subset))
             image_directory = os.path.join(self.train_dir, 'example_images')
             if os.path.exists(image_directory) is not True:
@@ -335,13 +341,29 @@ class Model_clf(Model):
                 except OSError:
                     print("Creation of the directory %s failed" % image_directory)
             example_image = (images[0]+1)*255/2
+            n = images.shape[0] #number of images
+            marginal_raw = np.ones((n,))/n
+            marginal_noise = np.ones((n,))/n
             img = Image.fromarray(example_image.astype('uint8'))
             img.save(self.train_dir + '/example_images/{}.png'.format(subset))
             #adding noise
             if FLAGS.noise_mode in ['Gaussian', 'speckle']:
                 noise_mean = 0 if FLAGS.noise_mean is None else FLAGS.noise_mean
                 print("{}-Mode:{}, Mean:{}, Var:{}, seed:{}".format(subset, FLAGS.noise_mode, noise_mean, FLAGS.noise_var, FLAGS.noise_seed))
+                raw_image_vectors = images.reshape((n,-1)) # (number of images, width*height*depth)
                 images = random_noise(images, mode=FLAGS.noise_mode, mean=noise_mean, var=FLAGS.noise_var, seed=FLAGS.noise_seed)
+                noisy_image_vectors = images.reshape((n,-1))
+                # Calculate Wasserstein distance
+                print("Calculating W_1 W_2 W_infty distance...")
+                dist_1_matrix = ot.dist(raw_image_vectors, noisy_image_vectors, 'cityblock') # cityblock means l_1 distance
+                dist_2_matrix = ot.dist(raw_image_vectors, noisy_image_vectors)
+                dist_infty_matrix = ot.dist(raw_image_vectors, noisy_image_vectors, 'chebyshev') #chebyshev means l_infty distance
+                weight_1_matrix = ot.emd(marginal_raw, marginal_noise, dist_1_matrix) # emd means 'earth mover's distance
+                weight_2_matrix = ot.emd(marginal_raw, marginal_noise, dist_2_matrix)
+                weight_infty_matrix = ot.emd(marginal_raw, marginal_noise, dist_infty_matrix)
+                Wasserstein_1.append(np.sum(weight_1_matrix*dist_1_matrix))
+                Wasserstein_2.append(np.sqrt(np.sum(weight_2_matrix*dist_2_matrix)))
+                Wasserstein_infty.append(np.sum(weight_infty_matrix*dist_infty_matrix))
                 #save noise settings
                 noise_settings = dict(Mode=FLAGS.noise_mode, Mean=noise_mean, Var=FLAGS.noise_var, seed=FLAGS.noise_seed)
                 print('saving an example of noisy {} image...'.format(subset))
@@ -350,7 +372,20 @@ class Model_clf(Model):
                 img.save(self.train_dir + '/example_images/{}_{}_{}_{}.png'.format(FLAGS.noise_mode, noise_mean, FLAGS.noise_var, subset))
             elif FLAGS.noise_mode in ['s&p']:
                 print("{}-Mode:{}, p:{}, seed:{}".format(subset, FLAGS.noise_mode, FLAGS.noise_p, FLAGS.noise_seed))
+                raw_image_vectors = images.reshape((images.shape[0],-1)) # (number of images, width*height*depth)
                 images = random_noise(images, mode=FLAGS.noise_mode, amount=FLAGS.noise_p, seed=FLAGS.noise_seed)
+                noisy_image_vectors = images.reshape((images.shape[0],-1))
+                # Calculate Wasserstein distance
+                print("Calculating W_1 W_2 W_infty distance...")
+                dist_1_matrix = ot.dist(raw_image_vectors, noisy_image_vectors, 'cityblock') # cityblock means l_1 distance
+                dist_2_matrix = ot.dist(raw_image_vectors, noisy_image_vectors)
+                dist_infty_matrix = ot.dist(raw_image_vectors, noisy_image_vectors, 'chebyshev') #chebyshev means l_infty distance
+                weight_1_matrix = ot.emd(marginal_raw, marginal_noise, dist_1_matrix) # emd means 'earth mover's distance
+                weight_2_matrix = ot.emd(marginal_raw, marginal_noise, dist_2_matrix)
+                weight_infty_matrix = ot.emd(marginal_raw, marginal_noise, dist_infty_matrix)
+                Wasserstein_1.append(np.sum(weight_1_matrix*dist_1_matrix))
+                Wasserstein_2.append(np.sqrt(np.sum(weight_2_matrix*dist_2_matrix)))
+                Wasserstein_infty.append(np.sum(weight_infty_matrix*dist_infty_matrix))
                 #save noise settings
                 noise_settings = dict(Mode=FLAGS.noise_mode, p=FLAGS.noise_p, seed=FLAGS.noise_seed)
                 print('saving an example of noisy {} image...'.format(subset))
@@ -371,7 +406,7 @@ class Model_clf(Model):
                 predicted.append(p)
             predicted = np.concatenate(predicted, axis=0)
             accuracies.append((predicted.argmax(1) == labels).mean() * 100)
-        return np.array(accuracies, 'f'), noise_settings
+        return np.array(accuracies, 'f'), noise_settings, np.array(Wasserstein_1, 'f'), np.array(Wasserstein_2, 'f'), np.array(Wasserstein_infty, 'f')
 
     def eval_sup_gradients(self, ckpt, batch=None, feed_extra=None, sup_gradients=None):
         """Evaluate sup norm of gradients of h(x,y)=loss(f(x),y) on test images."""

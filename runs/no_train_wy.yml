@@ -1,6 +1,6 @@
-session_name: l2 
+session_name: W2
 windows:
-  - window_name: l2_0.001
+  - window_name: W2
     layout: even-horizontal
     panes:
       - sh runs/no_noisy_eval_0.sh
