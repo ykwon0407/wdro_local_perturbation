@@ -1,5 +1,5 @@
 
-# Distributionally Robust Optimization with Interpolated Data
+# Principled Learning Method for Wasserstein Distributionally Robust Optimization with Local Perturbations
 In this repository, we provide all python codes used in the paper 'Principled Learning Method for Wasserstein Distributionally Robust Optimization with Local Perturbations'.
 
 ## Create virtual environment
