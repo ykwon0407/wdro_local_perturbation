@@ -1,6 +1,6 @@
 absl-py
 easydict
 cython
-numpy
+numpy==1.16.4
 tensorflow-gpu==1.14.0
 tqdm

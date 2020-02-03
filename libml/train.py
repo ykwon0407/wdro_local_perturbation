@@ -1,24 +1,11 @@
-# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""Training loop, checkpoint saving and loading, evaluation code."""
+"""
+Training loop, checkpoint saving and loading, evaluation code.
+"""
 
 import json
 import os
 import os.path
 import shutil
-import functools
-import ot
 
 import numpy as np
 import tensorflow as tf
@@ -33,7 +20,7 @@ from libml.noise import random_noise
 FLAGS = flags.FLAGS
 flags.DEFINE_string('train_dir', './experiments',
                     'Folder where to save training data.')
-flags.DEFINE_float('lr', 0.0001, 'Learning rate.')
+flags.DEFINE_float('lr', 0.002, 'Learning rate.')
 flags.DEFINE_integer('batch', 64, 'Batch size.')
 flags.DEFINE_integer('train_kimg', 1 << 14, 'Training duration in kibi-samples.')
 flags.DEFINE_integer('report_kimg', 64, 'Report summary period in kibi-samples.')
@@ -43,15 +30,12 @@ flags.DEFINE_string('eval_ckpt', '', 'Checkpoint to evaluate. If provided, do no
 flags.DEFINE_integer('saveperepoch', 10, 'epochs per Save checkpoint')
 
 #noise arguments
-flags.DEFINE_string('noise_mode', '', 'mode for noisy image(Gaussian, localvar, poisson, salt, pepper, s&p, speckle)')
-flags.DEFINE_float('noise_mean', None, 'Mean of random distribution. Used in gaussian and speckle')
-flags.DEFINE_float('noise_var', None, 'Variance of random distribution. Used in gaussian and speckle')
-flags.DEFINE_float('noise_p', None, 'Proportion of image pixels to replace with noise on range [0, 1]. Used in salt, pepper, and salt & pepper. Default : 0.05')
+flags.DEFINE_float('noise_p', None, 'Proportion of image pixels to replace with noise on range [0, 1]. Used in salt, pepper, and salt & pepper.')
 flags.DEFINE_integer('noise_seed', None, 'If provided, this will set the random seed before generating noise, for valid pseudo-random comparisons')
 
 class Model:
     def __init__(self, train_dir: str, dataset: data.DataSet, **kwargs):
-        self.train_dir = train_dir #, self.experiment_name(**kwargs))
+        self.train_dir = train_dir
         self.params = EasyDict(kwargs)
         self.dataset = dataset
         self.session = None
@@ -101,6 +85,7 @@ class Model:
             print('-'*50)
             pass
 
+    #Creating /args /tf in train.dir
     @property
     def arg_dir(self):
         return os.path.join(self.train_dir, 'args')
@@ -136,25 +121,11 @@ class Model:
 
     def experiment_name(self, **kwargs):
         args = [x + str(y) for x, y in sorted(kwargs.items())]
-        return '_'.join([self.__class__.__name__] + args) #Class name + args ex) FSgradient_LH1.0
+        return '_'.join([self.__class__.__name__] + args)
 
     def eval_mode(self, ckpt=None):
         self.session = tf.Session(config=utils.get_config())
         saver = tf.train.Saver()
-
-        '''
-        if ckpt is None:
-            ckpt = utils.find_latest_checkpoint(self.checkpoint_dir)
-        else:
-            ckpt = os.path.abspath(ckpt)
-            if os.path.exists(ckpt):
-                print('Eval model at %s' % ckpt)
-                ckpt = utils.find_latest_checkpoint(os.path.join(ckpt, 'tf'))
-            else:
-                print('The cpkt_eval does not exists... Searching the latest checkpoint')
-                ckpt = utils.find_latest_checkpoint(self.checkpoint_dir)
-            print('The cpkt path is : ', ckpt)
-        '''
 
         print('The cpkt path is : ', ckpt)
         saver.restore(self.session, ckpt)
@@ -186,15 +157,15 @@ class Model_clf(Model):
 
     def train(self, train_nimg, report_nimg, **kwargs):
         if FLAGS.eval_ckpt:
-            if FLAGS.noise_mode:
-                print("Evaluating accuracy with noisy train, valid, test images...")
+            if FLAGS.noise_p:
+                print("Evaluating the accuracy with noisy train, valid, test images...")
                 self.eval_noise(FLAGS.eval_ckpt, **kwargs)
             else:
+                print("Evaluating the gradients with test images...")
                 self.eval_checkpoint(FLAGS.eval_ckpt)
             return
         batch = FLAGS.batch
 
-        # with self.graph.as_default():
         train_labeled = self.dataset.train_labeled.batch(batch).prefetch(16)
         train_labeled = train_labeled.make_one_shot_iterator().get_next()
         scaffold = tf.train.Scaffold(saver=tf.train.Saver(max_to_keep=FLAGS.keep_ckpt,
@@ -208,7 +179,7 @@ class Model_clf(Model):
                 scaffold=scaffold,
                 checkpoint_dir=self.checkpoint_dir,
                 config=utils.get_config(),
-                save_checkpoint_steps=FLAGS.saveperepoch*report_nimg, #FLAGS.save_kimg,
+                save_checkpoint_steps=FLAGS.saveperepoch*report_nimg,
                 save_summaries_steps=report_nimg - batch) as train_session:
             self.session = train_session._tf_sess()
             self.tmp.step = self.session.run(self.step)
@@ -226,10 +197,8 @@ class Model_clf(Model):
 
     def tune(self, train_nimg):
         batch = FLAGS.batch
-        # with self.graph.as_default():
         train_labeled = self.dataset.train_labeled.batch(batch).prefetch(16)
         train_labeled = train_labeled.make_one_shot_iterator().get_next()
-        # epoch?
         for _ in trange(0, train_nimg, batch, leave=False, unit='img', unit_scale=batch, desc='Tuning'):
             x = self.session.run([train_labeled])
             self.session.run([self.ops.tune_op], feed_dict={self.ops.x: x['image'],
@@ -238,36 +207,28 @@ class Model_clf(Model):
     def eval_checkpoint(self, ckpt=None):
         self.eval_mode(ckpt)
         self.cache_eval()
-        #raw = self.eval_stats(classify_op=self.ops.classify_raw)
-        ema = self.eval_stats(classify_op=self.ops.classify_op)
+        ema, clean_correctness = self.eval_stats(classify_op=self.ops.classify_op)
         gradients = self.eval_sup_gradients(sup_gradients=self.ops.sup_gradients, ckpt=ckpt)
-        #self.tune(16384)
-        #tuned_raw = self.eval_stats(classify_op=self.ops.classify_raw)
-        tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
-        #print('%16s %8s %8s %8s' % (('raw',) + tuple('%.2f' % x for x in raw)))
-        #print('%16s %8s %8s %8s' % (('Lipschitz', '%.2f' % lipschitz, '', '')))
         print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
-        #print('%16s %8s %8s %8s' % (('tuned_raw',) + tuple('%.2f' % x for x in tuned_raw)))
-        #print('%16s %8s %8s %8s' % (('tuned_ema',) + tuple('%.2f' % x for x in tuned_ema)))
+        if os.path.exists(os.path.join(ckpt[:-23], 'gradients_{}.txt'.format(ckpt[-8:]))) is False:
+            with open(os.path.join(ckpt[:-23], 'gradients_{}.txt'.format(ckpt[-8:])), 'w') as outfile:
+                json.dump({'gradients': gradients.tolist()}, outfile)
+            print('gradients_{}.txt is saved at {}'.format(ckpt[-8:], ckpt[:-23]))
+
 
     def eval_noise(self, ckpt=None):
         self.eval_mode(ckpt)
         self.cache_eval()
-        print('Evaluating with noisy images')
-        ema = self.eval_stats(classify_op=self.ops.classify_op)
-        ema_noise, noise_settings, Wasserstein_1, Wasserstein_2, Wasserstein_infty = self.eval_stats_noise(classify_op=self.ops.classify_op)
-        #self.tune(16384)
-        tuned_ema = self.eval_stats(classify_op=self.ops.classify_op)
+        ema, clean_correctness = self.eval_stats(classify_op=self.ops.classify_op)
+        gradients = self.eval_sup_gradients(sup_gradients=self.ops.sup_gradients, ckpt=ckpt)
+        ema_noise, noise_settings, noisy_correctness = self.eval_stats_noise(classify_op=self.ops.classify_op)
         print('%16s %8s %8s %8s' % ('', 'labeled', 'valid', 'test'))
         print('%16s %8s %8s %8s' % (('ema',) + tuple('%.2f' % x for x in ema)))
         print('%16s %8s %8s %8s' % (('ema_noise',) + tuple('%.2f' % x for x in ema_noise)))
-        print('%16s %8s %8s %8s' % (('W_1 dist',) + tuple('%.2f' % x for x in Wasserstein_1)))
-        print('%16s %8s %8s %8s' % (('W_2 dist',) + tuple('%.2f' % x for x in Wasserstein_2)))
-        print('%16s %8s %8s %8s' % (('W_infty dist',) + tuple('%.2f' % x for x in Wasserstein_infty)))
         #Saving noise.txt
         noise_settings.update({'steps':ckpt[-8:]})
-        self.noise.update({str(noise_settings):ema_noise.tolist() + ema.tolist() + Wasserstein_2.tolist()})
+        self.noise.update({str(noise_settings):{'noise_acc':ema_noise.tolist(), 'clean_acc':ema.tolist(), 'clean_correctness':clean_correctness.tolist(), 'noisy_correctness':noisy_correctness.tolist()}})
         with open(os.path.join(ckpt[:-23], 'noise.txt'), 'w') as outfile:
             json.dump(self.noise, outfile)
 
@@ -312,14 +273,16 @@ class Model_clf(Model):
                     })
                 predicted.append(p)
             predicted = np.concatenate(predicted, axis=0)
-            accuracies.append((predicted.argmax(1) == labels).mean() * 100)
+            if subset == 'test':
+                clean_correctness = predicted.argmax(1) == labels
+            accuracies.append((predicted.argmax(1) == labels).mean() * 100)  #[train, valid, test]
         #print accuracies
         self.train_print('%-5d k imgs  accuracy train/valid/test  %.2f  %.2f  %.2f' %
                          tuple([self.tmp.step >> 10] + accuracies))
         self.accuracies['epoch' + str(self.tmp.step // FLAGS.epochsize)] = accuracies
         #Saving accurcies.txt
         if FLAGS.eval_ckpt:
-            return np.array(accuracies, 'f')
+            return np.array(accuracies, 'f'), clean_correctness
         with open(os.path.join(self.train_dir, 'accuracies.txt'), 'w') as outfile:
             json.dump(self.accuracies, outfile)
         return np.array(accuracies, 'f')
@@ -329,10 +292,10 @@ class Model_clf(Model):
         batch = batch or FLAGS.batch
         classify_op = self.ops.classify_op if classify_op is None else classify_op
         accuracies =  []
-        Wasserstein_1, Wasserstein_2, Wasserstein_infty = [], [], []
         for subset in ('train_labeled', 'valid', 'test'):
             images, labels = self.tmp.cache[subset]
-            #print('images.shape', images.shape)
+
+            # Saving an example clean image
             print('saving an example of original {} image...'.format(subset))
             image_directory = os.path.join(self.train_dir, 'example_images')
             if os.path.exists(image_directory) is not True:
@@ -346,54 +309,22 @@ class Model_clf(Model):
             marginal_noise = np.ones((n,))/n
             img = Image.fromarray(example_image.astype('uint8'))
             img.save(self.train_dir + '/example_images/{}.png'.format(subset))
-            #adding noise
-            if FLAGS.noise_mode in ['Gaussian', 'speckle']:
-                noise_mean = 0 if FLAGS.noise_mean is None else FLAGS.noise_mean
-                print("{}-Mode:{}, Mean:{}, Var:{}, seed:{}".format(subset, FLAGS.noise_mode, noise_mean, FLAGS.noise_var, FLAGS.noise_seed))
-                raw_image_vectors = images.reshape((n,-1)) # (number of images, width*height*depth)
-                images = random_noise(images, mode=FLAGS.noise_mode, mean=noise_mean, var=FLAGS.noise_var, seed=FLAGS.noise_seed)
-                noisy_image_vectors = images.reshape((n,-1))
-                # Calculate Wasserstein distance
-                print("Calculating W_1 W_2 W_infty distance...")
-                dist_1_matrix = ot.dist(raw_image_vectors, noisy_image_vectors, 'cityblock') # cityblock means l_1 distance
-                dist_2_matrix = ot.dist(raw_image_vectors, noisy_image_vectors)
-                dist_infty_matrix = ot.dist(raw_image_vectors, noisy_image_vectors, 'chebyshev') #chebyshev means l_infty distance
-                weight_1_matrix = ot.emd(marginal_raw, marginal_noise, dist_1_matrix) # emd means 'earth mover's distance
-                weight_2_matrix = ot.emd(marginal_raw, marginal_noise, dist_2_matrix)
-                weight_infty_matrix = ot.emd(marginal_raw, marginal_noise, dist_infty_matrix)
-                Wasserstein_1.append(np.sum(weight_1_matrix*dist_1_matrix))
-                Wasserstein_2.append(np.sqrt(np.sum(weight_2_matrix*dist_2_matrix)))
-                Wasserstein_infty.append(np.sum(weight_infty_matrix*dist_infty_matrix))
-                #save noise settings
-                noise_settings = dict(Mode=FLAGS.noise_mode, Mean=noise_mean, Var=FLAGS.noise_var, seed=FLAGS.noise_seed)
-                print('saving an example of noisy {} image...'.format(subset))
-                example_image = (images[0]+1)*255/2
-                img = Image.fromarray(example_image.astype('uint8'))
-                img.save(self.train_dir + '/example_images/{}_{}_{}_{}.png'.format(FLAGS.noise_mode, noise_mean, FLAGS.noise_var, subset))
-            elif FLAGS.noise_mode in ['s&p']:
-                print("{}-Mode:{}, p:{}, seed:{}".format(subset, FLAGS.noise_mode, FLAGS.noise_p, FLAGS.noise_seed))
+
+            # Adding noise
+            if FLAGS.noise_p > 0:
+                print("{}- p:{}, seed:{}".format(subset, FLAGS.noise_p, FLAGS.noise_seed))
                 raw_image_vectors = images.reshape((images.shape[0],-1)) # (number of images, width*height*depth)
-                images = random_noise(images, mode=FLAGS.noise_mode, amount=FLAGS.noise_p, seed=FLAGS.noise_seed)
+                images = random_noise(images, mode='s&p', amount=FLAGS.noise_p, seed=FLAGS.noise_seed)
                 noisy_image_vectors = images.reshape((images.shape[0],-1))
-                # Calculate Wasserstein distance
-                print("Calculating W_1 W_2 W_infty distance...")
-                dist_1_matrix = ot.dist(raw_image_vectors, noisy_image_vectors, 'cityblock') # cityblock means l_1 distance
-                dist_2_matrix = ot.dist(raw_image_vectors, noisy_image_vectors)
-                dist_infty_matrix = ot.dist(raw_image_vectors, noisy_image_vectors, 'chebyshev') #chebyshev means l_infty distance
-                weight_1_matrix = ot.emd(marginal_raw, marginal_noise, dist_1_matrix) # emd means 'earth mover's distance
-                weight_2_matrix = ot.emd(marginal_raw, marginal_noise, dist_2_matrix)
-                weight_infty_matrix = ot.emd(marginal_raw, marginal_noise, dist_infty_matrix)
-                Wasserstein_1.append(np.sum(weight_1_matrix*dist_1_matrix))
-                Wasserstein_2.append(np.sqrt(np.sum(weight_2_matrix*dist_2_matrix)))
-                Wasserstein_infty.append(np.sum(weight_infty_matrix*dist_infty_matrix))
+
                 #save noise settings
-                noise_settings = dict(Mode=FLAGS.noise_mode, p=FLAGS.noise_p, seed=FLAGS.noise_seed)
+                noise_settings = dict(p=FLAGS.noise_p, seed=FLAGS.noise_seed)
                 print('saving an example of noisy {} image...'.format(subset))
                 example_image = (images[0]+1)*255/2
                 img = Image.fromarray(example_image.astype('uint8'))
-                img.save(self.train_dir + '/example_images/{}_{}_{}.png'.format(FLAGS.noise_mode, FLAGS.noise_p, subset))
+                img.save(self.train_dir + '/example_images/{}_{}.png'.format(FLAGS.noise_p, subset))
             else:
-                assert False, "Please check noise_mode."
+                assert False, "Please check noise_p."
 
             predicted = []
             for x in range(0, images.shape[0], batch):
@@ -405,8 +336,11 @@ class Model_clf(Model):
                     })
                 predicted.append(p)
             predicted = np.concatenate(predicted, axis=0)
+            if subset == 'test':
+                noisy_correctness = predicted.argmax(1) == labels
             accuracies.append((predicted.argmax(1) == labels).mean() * 100)
-        return np.array(accuracies, 'f'), noise_settings, np.array(Wasserstein_1, 'f'), np.array(Wasserstein_2, 'f'), np.array(Wasserstein_infty, 'f')
+        return np.array(accuracies, 'f'), noise_settings, noisy_correctness
+
 
     def eval_sup_gradients(self, ckpt, batch=None, feed_extra=None, sup_gradients=None):
         """Evaluate sup norm of gradients of h(x,y)=loss(f(x),y) on test images."""
@@ -424,13 +358,6 @@ class Model_clf(Model):
                 })
             predicted.append(l)
         predicted = np.concatenate(predicted, axis=0)
-        #print('predicted.shape:',predicted.shape) (10000,)
-        #print('ckpt[:-23]:',ckpt[:-23])
-        #Saving gradients.txt
-        if os.path.exists(os.path.join(ckpt[:-23], 'gradients_{}.txt'.format(ckpt[-8:]))) is False:
-            with open(os.path.join(ckpt[:-23], 'gradients_{}.txt'.format(ckpt[-8:])), 'w') as outfile:
-                json.dump({'gradients': predicted.tolist()}, outfile)
-            print('gradients_{}.txt is saved at {}'.format(ckpt[-8:], ckpt[:-23]))
         return predicted
 
 

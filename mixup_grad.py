@@ -1,19 +1,3 @@
-# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""Mixup fully supervised training.
-"""
-
 import functools
 import os
 
@@ -40,7 +24,7 @@ class MixupGrad(MultiModel):
         lmix = l * mix[:, :, 0, 0] + l[::-1] * (1 - mix[:, :, 0, 0])
         return xmix, lmix
 
-    def model(self, lr, wd, ema, regularizer, gamma, LH, **kwargs):
+    def model(self, lr, wd, ema, gamma, **kwargs):
         hwc = [self.dataset.height, self.dataset.width, self.dataset.colors]
         x_in = tf.placeholder(tf.float32, [None] + hwc, 'x')
         l_in = tf.placeholder(tf.int32, [None], 'labels')
@@ -56,17 +40,12 @@ class MixupGrad(MultiModel):
         gradient = tf.gradients(loss_xe, x)[0] #output is list (batchsize, height, width, colors)
         loss_main = tf.reduce_mean(loss_xe)
 
-        if regularizer == 'maxsup':
-            loss_grad = tf.maximum(tf.reduce_max(tf.abs(gradient)) - tf.constant(LH), tf.constant(0.0))
-        elif regularizer == 'maxl2':
-            loss_grad = tf.maximum(tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32) - tf.square(LH), tf.constant(0.0))
-        elif regularizer == 'l2':
-            loss_grad = gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
-        elif regularizer == 'None':
-            # Same with mixup
+        if gamma == None:
             loss_grad = tf.constant(0.0)
+        elif gamma > 0:
+            loss_grad = gamma*tf.reduce_sum(tf.square(gradient))/tf.constant(FLAGS.batch, dtype=tf.float32)
         else:
-            assert False, 'unavailable regularizer, (maxsup, maxl2, l2, None)'
+            assert False, 'Check the penalty parameter gamma'
 
         tf.summary.scalar('losses/main', loss_main)
         tf.summary.scalar('losses/gradient', loss_grad)
@@ -87,32 +66,24 @@ class MixupGrad(MultiModel):
         with tf.control_dependencies([train_op]):
             train_op = tf.group(*post_ops)
 
-        # Tuning op: only retrain batch norm.
-        skip_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        classifier(x_in, training=True)
-        train_bn = tf.group(*[v for v in tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-                              if v not in skip_ops])
-
         return EasyDict(
-            x=x_in, label=l_in, train_op=train_op, tune_op=train_bn,
-            classify_raw=tf.nn.softmax(classifier(x_in, training=False)),  # No EMA, for debugging.
+            x=x_in, label=l_in, train_op=train_op,
             classify_op=tf.nn.softmax(classifier(x_in, getter=ema_getter, training=False)),
             sup_gradients = sup_gradients)
 
+
 def main(argv):
     del argv  # Unused.
-    dataset = DATASETS[FLAGS.dataset]() #create()
+    dataset = DATASETS[FLAGS.dataset]()
     log_width = utils.ilog2(dataset.width)
 
     #generating model directory
-    if FLAGS.regularizer == 'l2':
-        model_dir = 'l2_' + str(FLAGS.gamma)
-    elif FLAGS.regularizer == 'maxsup':
-        model_dir = 'maxsup_' + str(FLAGS.LH)
-    elif FLAGS.regularizer == 'None':
-        model_dir = 'mixup'
+    if FLAGS.gamma == None:
+        model_dir = 'MIXUP'
+    elif FLAGS.gamma > 0:
+        model_dir = 'WDRO_MIX_' + str(FLAGS.gamma)
     else:
-        assert False, 'Type of regularizer must be either: None, maxsup, maxl2, l2'
+        assert False, 'Check the penalty parameter gamma'
 
     model = MixupGrad(
         os.path.join(FLAGS.train_dir, model_dir, dataset.name),
@@ -125,14 +96,10 @@ def main(argv):
         ema=FLAGS.ema,
         beta=FLAGS.beta,
         gamma=FLAGS.gamma,
-        regularizer=FLAGS.regularizer,
-        LH=FLAGS.LH,
         scales=FLAGS.scales or (log_width - 2),
         filters=FLAGS.filters,
         repeat=FLAGS.repeat)
     model.train(FLAGS.nepoch*FLAGS.epochsize, FLAGS.epochsize) #(total # of data, epoch size)
-    # Gradient ??
-    #model.train(FLAGS.train_kimg << 10, FLAGS.report_kimg << 10)
 
 
 if __name__ == '__main__':
@@ -145,13 +112,8 @@ if __name__ == '__main__':
     flags.DEFINE_integer('repeat', 4, 'Number of residual layers per stage.')
     flags.DEFINE_integer('nepoch', 1 << 7, 'Number of training epochs')
     flags.DEFINE_integer('epochsize', 1 << 16, 'Size of 1 epoch')
-    flags.DEFINE_float('LH', 1, 'Lipschitz upper bound')
-    flags.DEFINE_float('gamma', 1, 'Regularization parameter')
-    flags.DEFINE_float('amount', 0, 'Probability of being salt or pepper')
-    flags.DEFINE_string('regularizer', 'None', 'Type of regularizer: None, maxsup, maxl2, l2')
-    flags.DEFINE_string('mode', '', 'Type of regularizer: None, maxsup, maxl2, l2')
+    flags.DEFINE_float('gamma', None, 'Regularization parameter')
     FLAGS.set_default('dataset', 'cifar10-1')
     FLAGS.set_default('batch', 64)
     FLAGS.set_default('lr', 0.002)
-    #FLAGS.set_default('train_kimg', 1 << 16)
     app.run(main)

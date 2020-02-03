@@ -1,62 +1,116 @@
 
 # Distributionally Robust Optimization with Interpolated Data
-In this repository, we provide all python codes used in the paper 'Distributionally Robust Optimization with Interpolated Data'.
+In this repository, we provide all python codes used in the paper 'Principled Learning Method for Wasserstein Distributionally Robust Optimization with Local Perturbations'.
 
-## NEED TO CHANGE IT WITH SHELL FILES. - (YC. Nov 5.)
+## Create virtual environment
+```
+sudo apt install python3-dev python3-virtualenv python3-tk imagemagick
+virtualenv -p python3 --system-site-packages WDRO
+source WDRO/bin/activate
+```
 
-## Prepare datasets
-The following simple code produces the `tfrecord` files used in this repository.
+## Install dependencies
 ```
-sh runs/prepare_datasets.sh
+cd DIRECTORY_TO_CLONED_FILE
+pip3 install -r requirements.txt
 ```
-The produced `tfrecord` files are named as `${dataset}.${seed}@${train_size}-{valid_size}` for each `seed` and `train_size`. For example, `cifar10.1@5000-1.tfrecord`.
+
+## Install datasets
+Check if there are `cifar10-train.tfrecord`, `cifar10-test.tfrecord`, `cifar100-train.tfrecord`, and `cifar100-test.tfrecord` first!
+```
+# Create the 5 independent training sets
+for seed in 1 2 3 4 5; do
+    for size in 2500 5000 25000 50000; do
+        CUDA_VISIBLE_DEVICES= python3 ./input/create_split.py --seed=$seed --size=$size ./input/cifar10/cifar10 ./input/cifar10-train.tfrecord
+        CUDA_VISIBLE_DEVICES= python3 ./input/create_split.py --seed=$seed --size=$size ./input/cifar100/cifar100 ./input/cifar100-train.tfrecord
+    done
+done
+```
+This code produces `tfrecord` files in `./input/cifar10` and `./input/cifar100`.  Each `tfrecord` file has the form: `${dataset}.${seed}@${train_size}-{valid_size}`.
+
+## Quick start
+Train the model and evaluate accuracy for Section 5.1 and evaluate gradients for Section 5.2. Set the number of GPU devices before run this code.
+```
+sh runs/train.sh
+sh runs/section_5_1.sh
+sh runs/section_5_2.sh
+```
+
 
 ## Train models
-Train (ERM/mixup/l2) model with `cifar10.1@50000-1.tfrecord` dataset. The following codes evaluate test accuracy at every epoch and save at `/path-to-model/accuracies.txt`. 
+Train ERM with weight decay 0.02 and smoothing 0.001 for 100 epochs.
 ```
-python3 erm.py --dataset=cifar10.1@50000-1 --wd=0.02 --smoothing 0.001
-python3 mixup_grad.py --dataset=cifar100.5@5000-1 --nepoch 100
-python3 mixup_grad.py --dataset=cifar100.5@5000-1 --regularizer l2 --gamma 0.008
+for seed in 1 2 3 4 5; do
+  for size in 2500 5000 25000 50000; do
+    CUDA_VISIBLE_DEVICES= python3 erm.py --dataset=cifar10.$seed@$size-1 --wd=0.02 --smoothing 0.001 --nepoch 100
+    CUDA_VISIBLE_DEVICES= python3 erm.py --dataset=cifar100.$seed@$size-1 --wd=0.02 --smoothing 0.001 --nepoch 100
+  done
+done
 ```
 
-<!---This code creates `./experiments/erm/cifar10.1@50000-1/tf, args` directory and save model checkpoints and arguments. In addition, this code also saves train, validation and test accuracy on each epochs at `./experiments/erm/cifar10.1@50000-1/accuracies.txt`--->
-<!---This code creates `./experiments/mixup/cifar100.1@5000-1/tf, args` directory and save model checkpoints and arguments. In addition, this code also saves train, validation and test accuracy on each epochs at `./experiments/mixup/cifar100.1@5000-1/accuracies.txt`--->
-<!---This code creates `./experiments/l2_0.1234/cifar100.1@5000-1/tf, args` directory and save model checkpoints and arguments. In addition, this code also saves train, validation and test accuracy on each epochs at `./experiments/l2_0.1234/cifar100.1@5000-1/accuracies.txt`--->
+Train MIXUP for 100 epochs.
+```
+for seed in 1 2 3 4 5; do
+  for size in 2500 5000 25000 50000; do
+    CUDA_VISIBLE_DEVICES= python3 mixup_grad.py --dataset=cifar10.$seed@$size-1 --nepoch 100
+    CUDA_VISIBLE_DEVICES= python3 mixup_grad.py --dataset=cifar100.$seed@$size-1 --nepoch 100
+  done
+done
+```
 
-## Evaluation with trained models
-### Accuracy with noisy images
+Train WDRO for 100 epochs.
+```
+for seed in 1 2 3 4 5; do
+  for size in 2500 5000 25000 50000; do
+    CUDA_VISIBLE_DEVICES= python3 erm.py --dataset=cifar10.$seed@$size-1 --gamma 0.004 --nepoch 100
+    CUDA_VISIBLE_DEVICES= python3 erm.py --dataset=cifar100.$seed@$size-1 --gamma 0.004 --nepoch 100
+  done
+done
+```
 
-Evaluation of the trained (ERM/mixup/l2) model with noisy samples. 
+Train WDRO+MIX for 100 epochs.
 ```
-python3 erm.py --eval_ckpt experiments/erm/cifar100.1@1000-1/tf/model.ckpt-06553600 -dataset=cifar100.1@1000-1 --noise_mode 'Gaussian' --noise_var 0.01
-python3 mixup_grad.py --eval_ckpt experiments/mixup/cifar10.4@1000-1/tf/model.ckpt-06553600 --dataset=cifar10.4@1000-1 --noise_mode 's&p' --noise_p 0.01
-python3 mixup_grad.py --eval_ckpt experiments/l2_0.008/cifar100.1@1000-1/tf/model.ckpt-06553600 --dataset=cifar100.1@1000-1 --regularizer l2 --gamma 0.008 --noise_mode 'Gaussian' --noise_var 0.01
+for seed in 1 2 3 4 5; do
+  for size in 2500 5000 25000 50000; do
+    CUDA_VISIBLE_DEVICES= python3 mixup_grad.py --dataset=cifar10.$seed@$size-1 --gamma 0.004 --nepoch 100
+    CUDA_VISIBLE_DEVICES= python3 mixup_grad.py --dataset=cifar100.$seed@$size-1 --gamma 0.004 --nepoch 100
+  done
+done
 ```
-<!---This code evaluates accuracy using train, valid and test images affected by Gaussian noise with sigma=0.01, and save at `./experiments/erm/cifar100.1@1000-1/noise.txt`--->
+Each trained model is saved at `./experiments/METHOD_NAME/cifar10 (or cifar100).$seed@$size-1/tf, args` directory. In addition, train, validation and test accuracy evaluated on each epochs are saved at `./experiments/METHOD_NAME/cifar10 (or cifar 100).$seed@$size-1/accuracies.txt`.
 
 
-### Gradients of loss with respect to 10,000 test images.
-Computation of gradients with the (ERM/mixup/l2) model saved at checkpoint: `experiments/-model-/cifar10.1@100-1/tf/model.ckpt-06553600`
+## Evaluation of accuracy with noisy images (Section 5.1)
 ```
-python3 erm.py  --eval_ckpt experiments/erm/cifar10.1@100-1/tf/model.ckpt-06553600 --dataset=cifar10.1@100-1
-python3 mixup_grad.py  --eval_ckpt experiments/mixup/cifar100.4@1000-1/tf/model.ckpt-01310720 --dataset=cifar100.4@1000-1
-python3 mixup_grad.py  --eval_ckpt experiments/l2_0.1234/cifar10.5@50000-1/tf/model.ckpt-04587520 --dataset=cifar10.5@50000-1
+for seed in 1 2 3 4 5; do
+  for size in 2500 5000 25000 50000; do
+    for dataset in cifar10 cifar100; do
+      CUDA_VISIBLE_DEVICES= python3 erm.py --eval_ckpt experiments/ERM/$dataset.$seed@$size-1/tf/model.ckpt-06553600 -dataset=$dataset.$seed@$size-1 --noise_p 0.01
+      CUDA_VISIBLE_DEVICES= python3 erm.py --eval_ckpt experiments/WDRO_0.004/$dataset.$seed@$size-1/tf/model.ckpt-06553600 -dataset=$dataset.$seed@$size-1 --noise_p 0.01
+      CUDA_VISIBLE_DEVICES= python3 mixup_grad.py --eval_ckpt experiments/MIXUP/$dataset.$seed@$size-1/tf/model.ckpt-06553600 -dataset=$dataset.$seed@$size-1 --noise_p 0.01
+      CUDA_VISIBLE_DEVICES= python3 mixup_grad.py --eval_ckpt experiments/WDRO_MIX_0.004/$dataset.$seed@$size-1/tf/model.ckpt-06553600 -dataset=$dataset.$seed@$size-1 --noise_p 0.01
+    done
+  done
+done
 ```
-This code evaluates sup norm of each gradient vectors.
+Each accuracy on the clean and noisy datasets is saved at `./experiments/METHOD_NAME/cifar10 (or cifar100).$seed@$size-1/noise.txt`.
 
-<!---
-Example 2. Evaluation with the mixup model saved at checkpoint: `experiments/mixup/cifar100.4@1000-1/tf/model.ckpt-01310720`
+## Evaluation of the gradients of a loss (Section 5.2)
 ```
-CUDA_VISIBLE_DEVICES=0 python3 mixup_grad.py  --eval_ckpt experiments/mixup/cifar100.4@1000-1/tf/model.ckpt-01310720 --dataset=cifar100.4@1000-1
+for steps in 00655360 01310720 01966080 02621440 03276800 03932160 04587520 05242880 05898240 06553600; do
+  for seed in 1 2 3 4 5; do
+    for size in 2500 5000 25000 50000; do
+      for dataset in cifar10 cifar100; do
+        CUDA_VISIBLE_DEVICES= python3 erm.py --eval_ckpt experiments/ERM/$dataset.$seed@$size-1/tf/model.ckpt-$steps -dataset=$dataset.$seed@$size-1
+        CUDA_VISIBLE_DEVICES= python3 erm.py --eval_ckpt experiments/WDRO_0.004/$dataset.$seed@$size-1/tf/model.ckpt-$steps -dataset=$dataset.$seed@$size-1
+        CUDA_VISIBLE_DEVICES= python3 mixup_grad.py --eval_ckpt experiments/MIXUP/$dataset.$seed@$size-1/tf/model.ckpt-$steps -dataset=$dataset.$seed@$size-1
+        CUDA_VISIBLE_DEVICES= python3 mixup_grad.py --eval_ckpt experiments/WDRO_MIX_0.004/$dataset.$seed@$size-1/tf/model.ckpt-$steps -dataset=$dataset.$seed@$size-1
+			done
+		done
+	done
+done
 ```
-This code evaluates sup norm of each gradient vectors and save at `./experiments/mixup/cifar100.4@1000-1/gradients-01310720.txt`
-
-Example 3. Evaluation with the l2 (gamma=0.1234) model saved at checkpoint: `experiments/l2_0.1234/cifar10.5@50000-1/tf/model.ckpt-04587520`
-```
-CUDA_VISIBLE_DEVICES=0 python3 mixup_grad.py  --eval_ckpt experiments/l2_0.1234/cifar10.5@50000-1/tf/model.ckpt-04587520 --dataset=cifar10.5@50000-1
-```
-This code evaluates sup norm of each gradient vectors and save at `./experiments/l2_0.1234/cifar10.5@50000-1/gradients-04587520.txt`
---->
+The l-infinity norm of the gradients is saved at `./experiments/METHOD_NAME/cifar10 (or cifar100).$seed@$size-1/gradients-$steps.txt`.
 
 ## Directory tree
 
@@ -65,30 +119,28 @@ This code evaluates sup norm of each gradient vectors and save at `./experiments
 ├── erm.py
 ├── experiments
 ├── input
-│   ├── create_datasets.py
+│   ├── cifar10-test.tfrecord
+│   ├── cifar10-train.tfrecord
+│   ├── cifar100-test.tfrecord
+│   ├── cifar100-train.tfrecord
 │   └── create_split.py
 ├── libml
 │   ├── data.py
-│   ├── extract_accuracies_wy.py
-│   ├── extract_accuracies_yc.py
-│   ├── __init__.py
 │   ├── layers.py
 │   ├── models.py
-│   ├── spectral_norm.py
+│   ├── noise.py
 │   ├── train.py
 │   └── utils.py
 ├── mixup_grad.py
-├── notebook
 ├── README.md
 ├── requirements.txt
 └── runs
+    ├── section_5_1.sh
+    ├── section_5_2.sh
+    └── train.sh
 ```
 
+## Disclaimer
+This code has been modified from the original version at https://github.com/google-research/mixmatch
 
-
-## Author
-
-Yongchan Kwon, Ph.D. student, Department of Statistics, Seoul National University
-
-Wonyoung Kim, Ph.D. student, Department of Statistics, Seoul National University
-
+Since this code is under ICML anonymous review, complete license or copyrights will be updated after the review.

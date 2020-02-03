@@ -9,8 +9,8 @@ matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 plt.style.use('seaborn-white')
 
-model_list = ['erm','mixup','l2_0.001','l2_0.002','l2_0.004','l2_0.008']
-name_list=['ERM','Mixup','l2_0.001','l2_0.002','l2_0.004','l2_0.008']
+model_list = ['erm','mixup','erm_0.004','l2_0.004']
+name_list=['erm','mixup','erm_0.004','l2_0.004']
 color_list=['gray', 'red', 'skyblue', 'dodgerblue','blue', 'navy'] # darkslateblue
 
 '''
@@ -27,7 +27,7 @@ t_sig_level = 0.05
 def summarize_final_results(dataset='cifar10', n_last=n_last, result_path='../results'):
     '''
     Calculate the mean and standard deviation of results of the last 'n_last' epochs.
-    '''        
+    '''
     split_list = ['tr','val','test']
     df = pd.DataFrame(columns=['data','model','sample','mean','std'])
 
@@ -41,7 +41,7 @@ def summarize_final_results(dataset='cifar10', n_last=n_last, result_path='../re
             for path in path_list:
                 f = json.load(open(path, "r"))
                 tmp.append(pd.DataFrame(f, index=split_list))
-            
+
             assert len(tmp) == 5, 'Check the number of experiments (seeds), we run 5 times'
             tmp = pd.concat(tmp, sort=False)
             tmp_test = tmp.loc['test'].iloc[:,-n_last:]
@@ -50,12 +50,12 @@ def summarize_final_results(dataset='cifar10', n_last=n_last, result_path='../re
             tmp_dict = {'data': dataset,
                         'model': model,
                         'sample': sample,
-                        'mean': np.mean(tmp_test), 
+                        'mean': np.mean(tmp_test),
                         'std': np.std(np.mean(tmp_test, axis=1)),
                         'raw_data': np.mean(tmp_test, axis=1)}
             df = df.append(tmp_dict, ignore_index=True)
 
-    return df    
+    return df
 
 
 def print_t_test_results(dataset='cifar10'):
@@ -66,7 +66,7 @@ def print_t_test_results(dataset='cifar10'):
         print('dataset:',dataset)
         print('sample:', sample_size)
         print('-'*10)
-        
+
         df = df_data[df_data['sample']==sample_size].reset_index()
         best_acc_index = df['mean'].values.argmax()
         for j in range(df.shape[0]):
@@ -81,17 +81,17 @@ def show_summary_plot(dataset='cifar10'):
     plt.xlabel("Sample size $n$", fontsize=label_font_size)
     plt.ylabel('Test accuracy (in %)', fontsize=label_font_size)
     plt.title('Dataset: {}'.format(dataset), fontsize=title_font_size)
-    
+
     for i in range(len(color_list)):
         ymean = df_data['mean'][df_data['model']==model_list[i]]
         yerr = df_data['std'][df_data['model']==model_list[i]]
-        plt.plot(sample_size_list, ymean, marker='o', color=color_list[i], label=name_list[i], alpha=0.75) 
+        plt.plot(sample_size_list, ymean, marker='o', color=color_list[i], label=name_list[i], alpha=0.75)
         plt.fill_between(sample_size_list, ymean-SIGMA*yerr, ymean+SIGMA*yerr,
                          alpha=0.2, edgecolor=color_list[i],
                          facecolor=color_list[i])
     plt.legend(loc='lower right', borderaxespad=0., fontsize=legend_font_size)
 
-    
+
 def print_summary_table(dataset='cifar10'):
     df_data = summarize_final_results(dataset, n_last=n_last)
     ncol = 2 + len(df_data['model'].drop_duplicates()) + 2
@@ -103,7 +103,7 @@ def print_summary_table(dataset='cifar10'):
     line = line + str(r'\hline' + '\n'
                       + r'\hline' + '\n'
                       + r'\multirow{5}{*}{%s}' % df_data['data'][0] + '\n'
-                     ) 
+                     )
     for sample in sorted(df_data['sample'].drop_duplicates()):
         line = line + '& %d ' % sample
         for model in df_data['model'].drop_duplicates():
@@ -113,7 +113,7 @@ def print_summary_table(dataset='cifar10'):
         # line = line + r'\cline{2-%d}' % ncol + '\n')
     line = line[:-12]
     line = line + r'\hline' + '\n' + r'\end{tabular}'
-    
+
     print(line)
 
 
@@ -159,11 +159,9 @@ def summarize_noise_results(dataset='cifar10', result_path='../results', **kwarg
                     print(path)
                     print(str(f_key))
                     acc = f[str(f_key)]
-                # acc: [noise_tr, noise_val, noise_test, tr, val, test]
-                acc[3] = acc[0] - acc[3]
-                acc[4] = acc[1] - acc[4]
-                acc[5] = acc[2] - acc[5]
-                tmp.append(pd.DataFrame(acc, index=split_list))
+                # acc: {"noise_acc":[noise_tr, noise_val, noise_test], "clean_acc":[tr, val, test]}
+                gap = [acc["noise_acc"][i]-acc["clean_acc"][i] for i in range(3)]
+                tmp.append(pd.DataFrame(acc["noise_acc"] + gap, index=split_list))
             tmp = pd.concat(tmp, sort=False)
             tmp_mean = tmp.groupby(level=0).mean()
             tmp_std = tmp.groupby(level=0).std()
@@ -196,16 +194,16 @@ def print_t_test_noise_results(dataset='cifar10', **kwargs):
         noise_settings = {'Mode':mode, 'p':p, 'seed':None}
     else:
         assert False, 'mode is None'
-        
+
     df_data = summarize_noise_results(dataset=dataset, result_path='../results', **kwargs)
-    
+
     for sample_size in sample_size_list:
         print('-'*10)
         print('dataset:',dataset)
         print('sample:', sample_size)
         print('noise:', noise_settings)
         print('-'*10)
-        
+
         df = df_data[df_data['sample']==sample_size].reset_index()
         best_acc_index = df['noise_test_mean'].values.argmax()
         for j in range(df.shape[0]):
@@ -214,32 +212,32 @@ def print_t_test_noise_results(dataset='cifar10', **kwargs):
 
 def show_noise_plot(dataset='cifar10', split='train', **kwargs):
     df_data = summarize_noise_results(dataset=dataset, **kwargs)
-    
+
     plt.figure(figsize=(8,6))
     # plt.xlabel('$\log$(# of samples)', fontsize=label_font_size)
     plt.xlabel("Sample size $n$", fontsize=label_font_size)
     plt.ylabel('Accuracy (in %)', fontsize=label_font_size)
     plt.title('Dataset: {}, Noise:{}'.format(dataset, df_data['noise_settings'][0]), fontsize=title_font_size)
-    
+
     if split is 'train':
         for i in range(len(color_list)):
             ymean = df_data['noise_tr_mean'][df_data['model']==model_list[i]]
             yerr = df_data['noise_tr_std'][df_data['model']==model_list[i]]
-            plt.plot(sample_size_list, ymean, '--', marker='o', color=color_list[i], alpha=0.5) 
+            plt.plot(sample_size_list, ymean, '--', marker='o', color=color_list[i], alpha=0.5)
             plt.fill_between(sample_size_list, ymean-SIGMA*yerr, ymean+SIGMA*yerr,
              alpha=0.1, edgecolor=color_list[i], facecolor=color_list[i])
     elif split is 'test':
         for i in range(len(color_list)):
             ymean = df_data['noise_test_mean'][df_data['model']==model_list[i]]
             yerr = df_data['noise_test_std'][df_data['model']==model_list[i]]
-            plt.plot(sample_size_list, ymean, '--', marker='o', color=color_list[i], label=name_list[i], alpha=0.75) 
+            plt.plot(sample_size_list, ymean, '--', marker='o', color=color_list[i], label=name_list[i], alpha=0.75)
             plt.fill_between(sample_size_list, ymean-SIGMA*yerr, ymean+SIGMA*yerr,
              alpha=0.3, edgecolor=color_list[i], facecolor=color_list[i])
     else:
         assert False, 'check split (train or test)'
-    
+
     plt.legend(loc='lower right', borderaxespad=0., fontsize=legend_font_size)
-    plt.show()    
+    plt.show()
 
 
 def print_summary_noise_table(dataset='cifar10', split='test', **kwargs):
@@ -257,7 +255,7 @@ def print_summary_noise_table(dataset='cifar10', split='test', **kwargs):
     line = line + str(r'\hline' + '\n'
                       + r'\hline' + '\n'
                       + r'\multirow{5}{*}{%s}' % df_data['data'][0] + '\n'
-                     ) 
+                     )
     for sample in sorted(df_data['sample'].drop_duplicates()):
         if split is 'test':
             mean_ind, std_ind = 'noise_test_mean', 'noise_test_std'
@@ -279,19 +277,19 @@ def print_summary_noise_table(dataset='cifar10', split='test', **kwargs):
 '''
 def show_noise_gap_plot(dataset='cifar10', split='test', **kwargs):
     df_data = summarize_noise_results(dataset=dataset, **kwargs)
-    
+
     plt.figure(figsize=(8,6))
     # plt.xlabel('$log$(# of samples)', fontsize=label_font_size)
     plt.xlabel("Sample size $n$", fontsize=label_font_size)
     plt.ylabel('Accuracy (in %)', fontsize=label_font_size)
     plt.title('Dataset: {}, Noise:{}'.format(dataset, df_data['noise_settings'][0]), fontsize=title_font_size)
-    
+
     if split is 'train':
         for i in range(len(color_list)):
             ymean = df_data['gap_tr_mean'][df_data['model']==model_list[i]]
             yerr = df_data['gap_tr_std'][df_data['model']==model_list[i]]
             plt.plot(sample_size_list, ymean, '--', marker='o',
-             color=color_list[i], alpha=0.5, label=name_list[i]) 
+             color=color_list[i], alpha=0.5, label=name_list[i])
             plt.fill_between(sample_size_list, ymean-SIGMA*yerr, ymean+SIGMA*yerr,
              alpha=0.1, edgecolor=color_list[i], facecolor=color_list[i])
     elif split is 'test':
@@ -300,13 +298,13 @@ def show_noise_gap_plot(dataset='cifar10', split='test', **kwargs):
             ymean = df_data['gap_test_mean'][df_data['model']==model_list[i]]
             yerr = df_data['gap_test_std'][df_data['model']==model_list[i]]
             plt.plot(sample_size_list, ymean, '--', marker='o',
-             color=color_list[i], label=name_list[i], alpha=0.75) 
+             color=color_list[i], label=name_list[i], alpha=0.75)
             plt.fill_between(sample_size_list, ymean-SIGMA*yerr, ymean+SIGMA*yerr,
              alpha=0.3, edgecolor=color_list[i], facecolor=color_list[i])
     else:
         assert False, 'check split (train or test)'
-    
+
     plt.legend(loc='lower right', borderaxespad=0., fontsize=legend_font_size)
     plt.show()
- 
+
 '''

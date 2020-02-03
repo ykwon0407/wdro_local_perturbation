@@ -1,20 +1,5 @@
-#!/usr/bin/env python
-
-# Copyright 2018 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Script to download all datasets and create .tfrecord files.
+"""
+Script to download all datasets and create .tfrecord files.
 """
 
 import collections
@@ -34,7 +19,6 @@ import tensorflow as tf
 from tqdm import trange
 
 URLS = {
-    'svhn': 'http://ufldl.stanford.edu/housenumbers/{}_32x32.mat',
     'cifar10': 'https://www.cs.toronto.edu/~kriz/cifar-10-matlab.tar.gz',
     'cifar100': 'https://www.cs.toronto.edu/~kriz/cifar-100-matlab.tar.gz',
 }
@@ -42,28 +26,12 @@ URLS = {
 
 def _encode_png(images):
     raw = []
-    with tf.Session() as sess, tf.device('cpu:0'):
+    with tf.compat.v1.Session() as sess, tf.device('cpu:0'):
         image_x = tf.placeholder(tf.uint8, [None, None, None], 'image_x')
         to_png = tf.image.encode_png(image_x)
         for x in trange(images.shape[0], desc='PNG Encoding', leave=False):
             raw.append(sess.run(to_png, feed_dict={image_x: images[x]}))
     return raw
-
-
-def _load_svhn():
-    splits = collections.OrderedDict()
-    for split in ['train', 'test', 'extra']:
-        with tempfile.NamedTemporaryFile() as f:
-            request.urlretrieve(URLS['svhn'].format(split), f.name)
-            data_dict = scipy.io.loadmat(f.name)
-        dataset = {}
-        dataset['images'] = np.transpose(data_dict['X'], [3, 0, 1, 2])
-        dataset['images'] = _encode_png(dataset['images'])
-        dataset['labels'] = data_dict['y'].reshape((-1))
-        # SVHN raw data uses labels from 1 to 10; use 0 to 9 instead.
-        dataset['labels'] -= 1
-        splits[split] = dataset
-    return splits
 
 def _load_cifar10():
     def unflatten(images):
@@ -157,8 +125,6 @@ CONFIGS = dict(
                  checksums=dict(train=None, test=None)),
     cifar100=dict(loader=_load_cifar100,
                   checksums=dict(train=None, test=None)),
-    # svhn=dict(loader=_load_svhn,
-    #           checksums=dict(train=None, test=None, extra=None)),    
 )
 
 
@@ -198,8 +164,3 @@ if __name__ == '__main__':
                     open(path, "wb").write(file_and_data.data)
             else:
                 saver(data, '%s-%s' % (name, sub_name))
-    
-    
-
-
-

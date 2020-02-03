@@ -1,17 +1,6 @@
-# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""Utilities."""
+"""
+Utilities.
+"""
 
 import glob
 import os
@@ -39,7 +28,7 @@ def get_config():
 
 def setup_tf():
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-    tf.logging.set_verbosity(tf.logging.ERROR)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 
 def smart_shape(x):
@@ -69,10 +58,10 @@ def find_latest_checkpoint(dir, glob_term='model.ckpt-*.meta'):
 
 def get_latest_global_step(dir):
     """Loads the global step from the latest checkpoint in directory.
-  
+
     Args:
       dir: string, path to the checkpoint directory.
-  
+
     Returns:
       int, the global step of the latest checkpoint or 0 if none was found.
     """
@@ -136,8 +125,6 @@ def get_available_gpus():
 
 
 def average_gradients(tower_grads):
-    # Adapted from:
-    #  https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10/cifar10_multi_gpu_train.py
     """Calculate the average gradient for each shared variable across all towers.
     Note that this function provides a synchronization point across all towers.
     Args:
@@ -203,6 +190,3 @@ def para_cat(fn, *args):
     if isinstance(outputs[0], (tuple, list)):
         return [tf.concat(x, axis=0) for x in zip(*outputs)]
     return tf.concat(outputs, axis=0)
-
-
-

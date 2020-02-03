@@ -16,12 +16,15 @@ results/
 no_*.sh
 
 ### JupyterNotebook ###
+notebook/
+summary_utils.py
 no_*.ipynb
 *.ipynb_checkpoints
 */.ipynb_checkpoints/*
 !make_figures.ipynb
 cifar10*.ipynb
 make_figures_*.ipynb
+
 
 ### macOS ###
 # General
@@ -38,6 +41,5 @@ __pycache__/
 
 
 # Working python files
-TODO_LIST 
+TODO_LIST
 change.py
-

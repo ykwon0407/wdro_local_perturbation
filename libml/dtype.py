@@ -6,15 +6,6 @@ __all__ = ['img_as_float32', 'img_as_float64', 'img_as_float',
            'img_as_int', 'img_as_uint', 'img_as_ubyte',
            'img_as_bool', 'dtype_limits']
 
-# For integers Numpy uses `_integer_types` basis internally, and builds a leaky
-# `np.XintYY` abstraction on top of it. This leads to situations when, for
-# example, there are two np.Xint64 dtypes with the same attributes but
-# different object references. In order to avoid any potential issues,
-# we use the basis dtypes here. For more information, see:
-# - https://github.com/scikit-image/scikit-image/issues/3043
-# For convenience, for these dtypes we indicate also the possible bit depths
-# (some of them are platform specific). For the details, see:
-# http://www.unix.org/whitepapers/64bit.html
 _integer_types = (np.byte, np.ubyte,          # 8 bits
                   np.short, np.ushort,        # 16 bits
                   np.intc, np.uintc,          # 16 or 32 or 64 bits
@@ -201,25 +192,6 @@ def convert(image, dtype, force_copy=False, uniform=False):
         By default (uniform=False) floating point values are scaled and
         rounded to the nearest integers, which minimizes back and forth
         conversion errors.
-
-    .. versionchanged :: 0.15
-        ``convert`` no longer warns about possible precision or sign
-        information loss. See discussions on these warnings at:
-        https://github.com/scikit-image/scikit-image/issues/2602
-        https://github.com/scikit-image/scikit-image/issues/543#issuecomment-208202228
-        https://github.com/scikit-image/scikit-image/pull/3575
-
-    References
-    ----------
-    .. [1] DirectX data conversion rules.
-           https://msdn.microsoft.com/en-us/library/windows/desktop/dd607323%28v=vs.85%29.aspx
-    .. [2] Data Conversions. In "OpenGL ES 2.0 Specification v2.0.25",
-           pp 7-8. Khronos Group, 2010.
-    .. [3] Proper treatment of pixels as integers. A.W. Paeth.
-           In "Graphics Gems I", pp 249-256. Morgan Kaufmann, 1990.
-    .. [4] Dirty Pixels. J. Blinn. In "Jim Blinn's corner: Dirty Pixels",
-           pp 47-57. Morgan Kaufmann, 1998.
-
     """
     image = np.asarray(image)
     dtypeobj_in = image.dtype
