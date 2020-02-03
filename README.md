@@ -15,9 +15,11 @@ cd DIRECTORY_TO_CLONED_FILE
 pip3 install -r requirements.txt
 ```
 
-## Install datasets
-Check if there are `cifar10-train.tfrecord`, `cifar10-test.tfrecord`, `cifar100-train.tfrecord`, and `cifar100-test.tfrecord` first!
+## Download and install datasets
 ```
+# Download CIFAR-10 CIFAR-100
+CUDA_VISIBLE_DEVICES= python3 ./input/create_datasets.py cifar10 cifar100
+
 # Create the 5 independent training sets
 for seed in 1 2 3 4 5; do
     for size in 2500 5000 25000 50000; do
