@@ -1,3 +1,4 @@
+example_images/
 *.iml
 *.tfrecord
 *.json
