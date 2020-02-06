@@ -118,28 +118,25 @@ The l-infinity norm of the gradients is saved at `./experiments/METHOD_NAME/cifa
 
 ```bash
 .
-├── erm.py
-├── experiments
 ├── input
-│   ├── cifar10-test.tfrecord
-│   ├── cifar10-train.tfrecord
-│   ├── cifar100-test.tfrecord
-│   ├── cifar100-train.tfrecord
+│   ├── create_datasets.py
 │   └── create_split.py
 ├── libml
 │   ├── data.py
+│   ├── dtype.py
 │   ├── layers.py
 │   ├── models.py
 │   ├── noise.py
 │   ├── train.py
 │   └── utils.py
+├── runs
+│   ├── section_5_1.sh
+│   ├── section_5_2.sh
+│   └── train.sh
+├── erm.py
 ├── mixup_grad.py
-├── README.md
-├── requirements.txt
-└── runs
-    ├── section_5_1.sh
-    ├── section_5_2.sh
-    └── train.sh
+├── README.pdf
+└── requirements.txt
 ```
 
 ## Disclaimer
