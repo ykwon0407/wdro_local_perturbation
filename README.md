@@ -31,7 +31,7 @@ done
 This code produces `tfrecord` files in `./input/cifar10` and `./input/cifar100`.  Each `tfrecord` file has the form: `${dataset}.${seed}@${train_size}-{valid_size}`.
 
 ## Quick start
-The codes below are for the quick start to implement the experiments in Section 5. `train.sh` trains a model using ERM, WDRO, MIXUP, and WDRO+MIX, `section_5_1.sh` evaluates accuracy using contaminated dataset as in Section 5.1, and `section_5_2.sh` calculates the gradients of a loss as in Section 5.2. The number of GPU devices is required to run this code.
+The codes below are for the implementation of experiments in Section 5. `train.sh` trains a model using ERM, WDRO, MIXUP, and WDRO+MIX, `section_5_1.sh` evaluates accuracy using contaminated dataset as in Section 5.1, and `section_5_2.sh` calculates the gradients of a loss as in Section 5.2. The number of GPU devices is required to run this code.
 ```
 sh runs/train.sh
 sh runs/section_5_1.sh

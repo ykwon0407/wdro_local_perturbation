@@ -1,20 +1,5 @@
-#!/usr/bin/env python
-
-# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""Script to create SSL splits from a dataset.
+"""
+Script to create SSL splits from a dataset.
 """
 
 from collections import defaultdict
@@ -65,7 +50,7 @@ def main(argv):
                 for i in session.run(it):
                     id_class.append(i)
                     # Dictionary consists of {class label : [index list]}
-                    class_id[i].append(count) 
+                    class_id[i].append(count)
                     count += 1
                 t.update(count - old_count)
     except tf.errors.OutOfRangeError:
@@ -104,7 +89,7 @@ def main(argv):
     print('Creating split in %s' % target)
     npos = np.zeros(nclass, np.int64)
     os.makedirs(os.path.dirname(target), exist_ok=True)
-    with tf.python_io.TFRecordWriter(target + '.tfrecord') as writer_label: 
+    with tf.python_io.TFRecordWriter(target + '.tfrecord') as writer_label:
         pos, loop = 0, trange(count, desc='Writing records')
         for input_file in input_files:
             for record in tf.python_io.tf_record_iterator(input_file):
@@ -121,6 +106,3 @@ def main(argv):
 if __name__ == '__main__':
     utils.setup_tf()
     app.run(main)
-
-
-    
