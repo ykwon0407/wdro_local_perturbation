@@ -94,7 +94,7 @@ def main(argv):
         filters=FLAGS.filters,
         repeat=FLAGS.repeat,
         gamma=FLAGS.gamma)
-    model.train(FLAGS.nepoch*FLAGS.epochsize, FLAGS.epochsize) #(total # of data, epoch size)
+    model.train(FLAGS.nckpt*FLAGS.ckptsize, FLAGS.ckptsize) #(total # of data, ckpt size)
 
 if __name__ == '__main__':
     utils.setup_tf()
@@ -104,8 +104,8 @@ if __name__ == '__main__':
     flags.DEFINE_integer('scales', 0, 'Number of 2x2 downscalings in the classifier.')
     flags.DEFINE_integer('filters', 32, 'Filter size of convolutions.')
     flags.DEFINE_integer('repeat', 4, 'Number of residual layers per stage.')
-    flags.DEFINE_integer('nepoch', 1 << 7, 'Number of training epochs')
-    flags.DEFINE_integer('epochsize', 1 << 16, 'Size of 1 epoch')
+    flags.DEFINE_integer('nckpt', 1 << 7, 'Number of checkpoints to train')
+    flags.DEFINE_integer('ckptsize', 1 << 16, 'Number of training samples to checkpoints')
     flags.DEFINE_float('gamma', None, 'Regularization parameter')
     FLAGS.set_default('dataset', 'cifar10')
     FLAGS.set_default('batch', 64)

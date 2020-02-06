@@ -27,7 +27,7 @@ flags.DEFINE_integer('report_kimg', 64, 'Report summary period in kibi-samples.'
 flags.DEFINE_integer('save_kimg', 64, 'Save checkpoint period in kibi-samples.')
 flags.DEFINE_integer('keep_ckpt', 50, 'Number of checkpoints to keep.')
 flags.DEFINE_string('eval_ckpt', '', 'Checkpoint to evaluate. If provided, do not do training, just do eval.')
-flags.DEFINE_integer('saveperepoch', 10, 'epochs per Save checkpoint')
+flags.DEFINE_integer('saveperckpt', 10, 'Number of Checkpotins to save')
 
 #noise arguments
 flags.DEFINE_float('noise_p', None, 'Proportion of image pixels to replace with noise on range [0, 1]. Used in salt, pepper, and salt & pepper.')
@@ -179,7 +179,7 @@ class Model_clf(Model):
                 scaffold=scaffold,
                 checkpoint_dir=self.checkpoint_dir,
                 config=utils.get_config(),
-                save_checkpoint_steps=FLAGS.saveperepoch*report_nimg,
+                save_checkpoint_steps=FLAGS.saveperckpt*report_nimg,
                 save_summaries_steps=report_nimg - batch) as train_session:
             self.session = train_session._tf_sess()
             self.tmp.step = self.session.run(self.step)
@@ -187,7 +187,7 @@ class Model_clf(Model):
             while self.tmp.step < train_nimg:
                 loop = trange(self.tmp.step % report_nimg, report_nimg, batch,
                               leave=False, unit='img', unit_scale=batch,
-                              desc='Epoch %d/%d' % (1 + (self.tmp.step // report_nimg), train_nimg // report_nimg))
+                              desc='Checkpoints %d/%d' % (1 + (self.tmp.step // report_nimg), train_nimg // report_nimg))
                 for _ in loop:
                     self.train_step(train_session, train_labeled)
                     while self.tmp.print_queue:
@@ -279,7 +279,7 @@ class Model_clf(Model):
         #print accuracies
         self.train_print('%-5d k imgs  accuracy train/valid/test  %.2f  %.2f  %.2f' %
                          tuple([self.tmp.step >> 10] + accuracies))
-        self.accuracies['epoch' + str(self.tmp.step // FLAGS.epochsize)] = accuracies
+        self.accuracies['Checkpoint' + str(self.tmp.step // FLAGS.ckptsize)] = accuracies
         #Saving accurcies.txt
         if FLAGS.eval_ckpt:
             return np.array(accuracies, 'f'), clean_correctness
