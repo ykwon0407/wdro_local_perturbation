@@ -31,7 +31,7 @@ done
 This code produces `tfrecord` files in `./input/cifar10` and `./input/cifar100`.  Each `tfrecord` file has the form: `${dataset}.${seed}@${train_size}-{valid_size}`.
 
 ## Quick start
-The codes below are for the quick start to implement the experiments in Section 5. `train.sh` trains a model using ERM, WDRO, MIXUP, and WDRO+MIX, `section_5_1.sh` evaluates accuracy using noisy dataset as in Section 5.1, and `section_5_2.sh` calculates the gradients of a loss as in Section 5.2. The number of GPU devices is required to run this code.
+The codes below are for the quick start to implement the experiments in Section 5. `train.sh` trains a model using ERM, WDRO, MIXUP, and WDRO+MIX, `section_5_1.sh` evaluates accuracy using contaminated dataset as in Section 5.1, and `section_5_2.sh` calculates the gradients of a loss as in Section 5.2. The number of GPU devices is required to run this code.
 ```
 sh runs/train.sh
 sh runs/section_5_1.sh
@@ -82,7 +82,7 @@ done
 Each trained model is saved at `./experiments/METHOD_NAME/cifar10 (or cifar100).$seed@$size-1/tf, args` directory. In addition, train, validation and test accuracy evaluated on each epochs are saved at `./experiments/METHOD_NAME/cifar10 (or cifar 100).$seed@$size-1/accuracies.txt`.
 
 
-## Evaluation of accuracy with noisy images (Section 5.1)
+## Evaluation of accuracy with contaminated images (Section 5.1)
 ```
 for seed in 1 2 3 4 5; do
   for size in 2500 5000 25000 50000; do
@@ -95,7 +95,7 @@ for seed in 1 2 3 4 5; do
   done
 done
 ```
-Each accuracy on the clean and noisy datasets is saved at `./experiments/METHOD_NAME/cifar10 (or cifar100).$seed@$size-1/noise.txt`.
+Each accuracy on the clean and contaminated datasets is saved at `./experiments/METHOD_NAME/cifar10 (or cifar100).$seed@$size-1/noise.txt`.
 
 ## Evaluation of the gradients of a loss (Section 5.2)
 ```
