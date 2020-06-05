@@ -168,4 +168,5 @@ The l-infinity norm of the gradients is saved at `./experiments/METHOD_NAME/cifa
 ## Disclaimer
 This code has been modified from the original version at https://github.com/google-research/mixmatch
 
-Since this code is under ICML anonymous review, complete license or copyrights will be updated after the review.
+
+
