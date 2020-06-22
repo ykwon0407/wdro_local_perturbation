@@ -4,10 +4,10 @@ This repository provides the Python implementation of the paper "Principled Lear
 
 ## Example results
 - Example of clean and noisy samples.
-<img src="./example_figures/figure1.png" width="200">
+<img src="./example_figures/figure1.png" width="600">
 
 - Accuracy comparison result. When data are noisy, the proposed method shows robustness.
-<img src="./example_figures/table2.png" width="400">
+<img src="./example_figures/table2.png" width="1200">
 
 ## Create virtual environment
 ```
