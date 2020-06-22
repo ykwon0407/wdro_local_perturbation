@@ -1,5 +1,5 @@
 
-# Principled Learning Method for Wasserstein Distributionally Robust Optimization with Local Perturbations
+# Principled learning method for Wasserstein distributionally robust optimization with local perturbations
 This repository provides the Python implementation of the paper "Principled Learning Method for Wasserstein Distributionally Robust Optimization with Local Perturbations" accepted for [ICML 2020](https://icml.cc/Conferences/2020/AcceptedPapersInitial). [[Paper link]](https://arxiv.org/abs/2006.03333)
 
 ## Example results
