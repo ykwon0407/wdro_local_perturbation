@@ -2,6 +2,14 @@
 # Principled Learning Method for Wasserstein Distributionally Robust Optimization with Local Perturbations
 This repository provides the Python implementation of the paper "Principled Learning Method for Wasserstein Distributionally Robust Optimization with Local Perturbations" accepted for [ICML 2020](https://icml.cc/Conferences/2020/AcceptedPapersInitial). [[Paper link]](https://arxiv.org/abs/2006.03333)
 
+## Example results
+-----
+- Example of clean and noisy samples.
+<img src="./example_figures/figure1.jpg" width="200">
+
+- Accuracy comparison result. When data are noisy, the proposed method shows robustness.
+<img src="./example_figures/table2.jpg" width="400">
+
 ## Create virtual environment
 ```
 sudo apt install python3-dev python3-virtualenv python3-tk imagemagick
